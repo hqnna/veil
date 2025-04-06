@@ -11,7 +11,9 @@
           nativeBuildInputs = with pkgs; [ zig zls ];
         };
 
-        packages.default = pkgs.stdenv.mkDerivation {
+        packages.default = self.packages.${system}.release;
+
+        packages.release = pkgs.stdenv.mkDerivation {
           pname = "veil";
           version = "0.1.0";
           doCheck = false;
@@ -21,7 +23,7 @@
 
           buildPhase = ''
             export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-            zig build --release=fast --summary new
+            zig build -Doptimize=ReleaseFast --summary new
           '';
 
           installPhase = ''
@@ -37,5 +39,18 @@
             license = licenses.bsd3Clear;
           };
         };
+
+        packages.debug = self.packages.${system}.release.overrideAttrs(old: {
+          version = "${old.version}-dev";
+
+          buildPhase = ''
+            export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
+            zig build -Doptimize=Debug --summary all
+          '';
+
+          installPhase = ''
+            install -D -m755 zig-out/bin/veil $out/bin/veil
+          '';
+        });
       });
 }
