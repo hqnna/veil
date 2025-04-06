@@ -28,7 +28,6 @@
 
           installPhase = ''
             install -Ds -m755 zig-out/bin/veil $out/bin/veil
-            strip -s $out/bin/veil
           '';
 
           meta = with pkgs.lib; {
