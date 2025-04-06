@@ -1,20 +1,17 @@
 image: nixos/latest
 
 environment:
+  # We need to enable flakes for our builds to work
   NIX_CONFIG: 'experimental-features = nix-command flakes'
+  # We want to disable all colored output within the ci
   NO_COLOR: 'true'
+  # See NO_COLOR
   TERM: 'dumb'
 
 artifacts:
-  - bin/veil-debug
-  - bin/veil-release
+  # The debug build artifact
+  - veil/result/bin/veil
 
 tasks:
-  - prepare: |
-      mkdir -p ~/bin
-  - debug: |
-      cd ~/veil && nix develop -c zig build
-      cp zig-out/bin/veil ~/bin/veil-debug
-  - release: |
-      cd ~/veil && nix build
-      cp result/bin/veil ~/bin/veil-release
+  # Build veil using the debug nix package
+  - build: cd ~/veil && nix build $PWD#debug
