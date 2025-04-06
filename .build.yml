@@ -1,0 +1,20 @@
+image: nixos/latest
+
+environment:
+  NIX_CONFIG: 'experimental-features = nix-command flakes'
+  NO_COLOR: 'true'
+  TERM: 'dumb'
+
+artifacts:
+  - bin/veil-debug
+  - bin/veil-release
+
+tasks:
+  - prepare: |
+      mkdir -p ~/bin
+  - debug: |
+      cd ~/veil && nix develop -c zig build
+      cp zig-out/bin/veil ~/bin/veil-debug
+  - release: |
+      cd ~/veil && nix build
+      cp result/bin/veil ~/bin/veil-release
