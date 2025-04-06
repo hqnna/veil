@@ -10,5 +10,32 @@
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [ zig zls ];
         };
+
+        packages.default = pkgs.stdenv.mkDerivation {
+          pname = "veil";
+          version = "0.1.0";
+          doCheck = false;
+          src = ./.;
+
+          nativeBuildInputs = with pkgs; [ zig ];
+
+          buildPhase = ''
+            export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
+            zig build --release=fast --summary new
+          '';
+
+          installPhase = ''
+            install -Ds -m755 zig-out/bin/veil $out/bin/veil
+            strip -s $out/bin/veil
+          '';
+
+          meta = with pkgs.lib; {
+            description = "An encrypted storage utility for the command line";
+            homepage = "https://git.sr.ht/~sapphic/veil";
+            maintainers = with maintainers; [ sapphic ];
+            platforms = platforms.linux;
+            license = licenses.bsd3Clear;
+          };
+        };
       });
 }
