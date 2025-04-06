@@ -24,3 +24,22 @@ $ nix build $PWD#release
 Which will build a **release** binary which is optimized for performance and is
 also stripped.
 
+---
+
+If you do not want to use Nix, you will need the latest tagged version of the 
+[Zig](https://ziglang.org) compiler, then run:
+
+```console
+$ zig build -Doptimize=Debug --summary all
+```
+
+This will build a **debug** binary without the use of Nix. To instead build a
+**release** binary, run the following:
+
+```console
+$ zig build -Doptimize=ReleaseFast --summary all
+$ strip -s zig-out/bin/veil
+```
+
+These two commands will build a performance optimized binary then strip it, like
+the nix package.
