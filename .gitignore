@@ -1,0 +1,22 @@
+# Direnv cache folder
+.direnv/
+
+# Nix build result
+result
+
+# Zig build artifacts
+.zig-cache/
+zig-out/
+
+# Editor specific files
+.DS_Store
+.vscode/
+.*.swp
+*.swp
+
+# Binaries and executables
+*.dylib
+*.exe
+*.dll
+*.so
+*.o
