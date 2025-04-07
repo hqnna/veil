@@ -6,7 +6,10 @@
 
   outputs = { self, nixpkgs, utils }:
     utils.lib.eachDefaultSystem(system:
-      let pkgs = import nixpkgs { inherit system; }; in {
+      let
+        pkgs = import nixpkgs { inherit system; };
+        cache = import ./nix/cache.nix { inherit pkgs; };
+      in {
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [ zig zls ];
         };
@@ -23,6 +26,7 @@
 
           buildPhase = ''
             export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
+            ln -sf ${cache} $ZIG_GLOBAL_CACHE_DIR/p
             zig build -Doptimize=ReleaseFast --summary new
           '';
 
@@ -44,6 +48,7 @@
 
           buildPhase = ''
             export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
+            ln -sf ${cache} $ZIG_GLOBAL_CACHE_DIR/p
             zig build -Doptimize=Debug --summary all
           '';
 
