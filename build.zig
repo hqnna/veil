@@ -14,5 +14,7 @@ pub fn build(b: *std.Build) anyerror!void {
         .name = "veil",
     });
 
+    const args = b.dependency("args", .{});
+    exe.root_module.addImport("args", args.module("args"));
     b.installArtifact(exe);
 }
