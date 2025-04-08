@@ -14,7 +14,14 @@ pub fn build(b: *std.Build) anyerror!void {
         .name = "veil",
     });
 
+    const zon = b.createModule(.{
+        .root_source_file = b.path("build.zig.zon"),
+        .optimize = optimize,
+        .target = target,
+    });
+
     const args = b.dependency("args", .{});
     exe.root_module.addImport("args", args.module("args"));
+    exe.root_module.addImport("zon", zon);
     b.installArtifact(exe);
 }
