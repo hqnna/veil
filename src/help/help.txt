@@ -3,5 +3,12 @@ Created by Hanna Rose <me@hanna.lol>
 
 usage: veil [options] <command>
 
--h, --help            Show this help message.
+--color=[bool]        Enable or disable colors.
+-h, --help            Show this help message text.
 --version             Show the current version.
+
+Color can also be enabled or disabled with the use
+of the NO_COLOR, HYPER_COLOR, and TERM environment
+variables. Setting NO_COLOR will disable color, as
+well as setting TERM to "dumb" will also disable it.
+You can set HYPER_COLOR to force enable color also.
