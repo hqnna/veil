@@ -1,7 +1,7 @@
 const std = @import("std");
 const args = @import("args");
 const help = @import("help/help.zig");
-const color = @import("color.zig");
+const color = @import("util/color.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut();

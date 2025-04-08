@@ -1,5 +1,5 @@
 const std = @import("std");
-const color = @import("../color.zig");
+const color = @import("../util/color.zig");
 const ver_str = @import("zon").version;
 const data = @embedFile("help.txt");
 
