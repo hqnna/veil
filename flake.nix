@@ -1,17 +1,30 @@
 {
   inputs = {
+    zlspkgs.url = "github:zigtools/zls/master";
     utils.url = "github:numtide/flake-utils/main";
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    zigpkgs.url = "github:mitchellh/zig-overlay/main";
+    zlspkgs.inputs.zig-overlay.follows = "zigpkgs";
+    zigpkgs.inputs.flake-utils.follows = "utils";
+    zigpkgs.inputs.nixpkgs.follows = "nixpkgs";
+    zlspkgs.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, utils }:
+  outputs = { self, nixpkgs, zigpkgs, zlspkgs, utils }:
     utils.lib.eachDefaultSystem(system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        cache = import ./nix/cache.nix { inherit pkgs; };
+        pkgs = nixpkgs.legacyPackages.${system};
+        zig = zigpkgs.packages.${system};
+        zls = zlspkgs.packages.${system};
+        cache = import ./nix/cache.nix {
+          inherit pkgs;
+          inherit zig;
+        };
       in {
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [ zig zls ];
+          nativeBuildInputs = with pkgs; [
+            zls.default
+            zig.master
+          ];
         };
 
         packages.default = self.packages.${system}.release;
@@ -22,7 +35,7 @@
           doCheck = false;
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [ zig ];
+          nativeBuildInputs = with pkgs; [ zig.master ];
 
           buildPhase = ''
             export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
@@ -44,7 +57,7 @@
         };
 
         packages.debug = self.packages.${system}.release.overrideAttrs(old: {
-          version = "${old.version}-dev";
+          version = "${old.version}-debug";
 
           buildPhase = ''
             export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)

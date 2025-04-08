@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, zig, ... }:
 
 pkgs.stdenv.mkDerivation {
   pname = "veil-cache";
@@ -6,7 +6,7 @@ pkgs.stdenv.mkDerivation {
   doCheck = false;
   src = ../.;
 
-  nativeBuildInputs = with pkgs; [ zig ];
+  nativeBuildInputs = with pkgs; [ zig.master ];
 
   buildPhase = ''
     export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)

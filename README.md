@@ -26,7 +26,7 @@ also stripped.
 
 ---
 
-If you do not want to use Nix, you will need the latest tagged version of the 
+If you do not want to use Nix, you will need the latest master version of the 
 [Zig](https://ziglang.org) compiler, then run:
 
 ```console
