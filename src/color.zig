@@ -16,7 +16,7 @@ pub fn checkCapability(
     use_color = value: {
         if (!cli_flag) break :value cli_flag;
         if (env.get("NO_COLOR")) |_| break :value false;
-        if (env.get("HYPER_COLOR")) |v| break :value std.mem.eql(u8, v, "true");
+        if (env.get("VEIL_COLOR")) |v| break :value std.mem.eql(u8, v, "true");
         if (env.get("TERM")) |v| break :value !std.mem.eql(u8, v, "dumb");
         break :value std.posix.isatty(terminal.handle);
     };
