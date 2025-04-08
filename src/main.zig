@@ -10,12 +10,13 @@ pub fn main() !void {
     var cli = try args.parseForCurrentProcess(struct {
         pub const shorthands = .{ .h = "help" };
         version: bool = false,
-        color: bool = false,
+        color: bool = true,
         help: bool = false,
     }, allocator, .silent);
     defer cli.deinit();
 
     try color.checkCapability(allocator, stdout, cli.options.color);
+
     if (cli.options.help) try help.print(stdout, .full);
     if (cli.options.version) try help.print(stdout, .version);
     if (cli.positionals.len == 0) try help.print(stdout, .usage);
