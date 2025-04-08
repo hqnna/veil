@@ -1,0 +1,7 @@
+An encrypted storage utility for the command line
+Created by Hanna Rose <me@hanna.lol>
+
+usage: veil [options] <command>
+
+-h, --help            Show this help message.
+--version             Show the current version.
