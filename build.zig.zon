@@ -2,7 +2,7 @@
     .name = .veil,
     .version = "0.1.0",
     .fingerprint = 0xd137d40a19b1b62e,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.0-dev.208+8acedfd5b",
 
     .dependencies = .{
         .args = .{
