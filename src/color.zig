@@ -9,7 +9,7 @@ pub fn checkCapability(
     allocator: std.mem.Allocator,
     terminal: std.fs.File,
     cli_flag: bool,
-) !void {
+) std.process.GetEnvMapError!void {
     var env = try std.process.getEnvMap(allocator);
     defer env.deinit();
 
