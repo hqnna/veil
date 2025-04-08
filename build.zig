@@ -21,7 +21,9 @@ pub fn build(b: *std.Build) anyerror!void {
     });
 
     const args = b.dependency("args", .{});
+    const ansi = b.dependency("ansi_term", .{});
     exe.root_module.addImport("args", args.module("args"));
+    exe.root_module.addImport("ansi", ansi.module("ansi_term"));
     exe.root_module.addImport("zon", zon);
     b.installArtifact(exe);
 }

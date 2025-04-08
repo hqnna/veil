@@ -9,6 +9,10 @@
             .url = "https://github.com/ikskuh/zig-args/archive/9425b94.tar.gz",
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
+        .ansi_term = .{
+            .url = "https://github.com/ziglibs/ansi_term/archive/c0e6ad0.tar.gz",
+            .hash = "ansi_term-0.1.0-_baAywpoAABEqsPmS5Jz_CddDCrG8qdIyRIESH8D2fzd",
+        },
     },
 
     .paths = .{
