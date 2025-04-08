@@ -20,3 +20,10 @@ pub fn checkCapability(
         break :value cli_flag or std.posix.isatty(terminal.handle);
     };
 }
+
+/// Set the color for a message and write it to the specified stream
+pub fn write(stream: anytype, color: ansi.style.Color, msg: []const u8) !void {
+    const style = ansi.style.Style{ .foreground = color };
+    if (use_color) try ansi.format.updateStyle(stream, style, null);
+    try stream.writeAll(msg);
+}
