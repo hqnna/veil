@@ -66,8 +66,9 @@ pub fn read(s: Keys, comptime k: Identity.KeyType) Error![]const u8 {
 pub fn exists(s: Keys) Error!bool {
     const k1 = try std.fs.path.join(s.allocator, &.{ s.dir, "secret.key" });
     const k2 = try std.fs.path.join(s.allocator, &.{ s.dir, "public.key" });
-    std.fs.accessAbsolute(k1, .{ .mode = .read_only }) catch return true;
-    std.fs.accessAbsolute(k2, .{ .mode = .read_only }) catch return true;
+    std.fs.accessAbsolute(k1, .{ .mode = .read_only }) catch return false;
+    std.fs.accessAbsolute(k2, .{ .mode = .read_only }) catch return false;
+    return true;
 }
 
 /// Destroy a storage utility
