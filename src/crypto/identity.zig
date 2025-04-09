@@ -18,6 +18,7 @@ pub const KeyType = enum(u1) { secret, public };
 pub const Error =
     std.base64.Error ||
     std.mem.Allocator.Error ||
+    Ed25519.Verifier.VerifyError ||
     error{
         IdentityElementError,
         InvalidEncoding,
@@ -25,6 +26,7 @@ pub const Error =
         InvalidSecret,
         EncodingError,
         NonCanonical,
+        KeyMismatch,
     };
 
 /// Generate a new user identity
@@ -68,6 +70,21 @@ pub fn scalar(id: Identity, out: Identity) Error!Scalar {
     const rid = try X25519.publicKeyFromEd25519(out.public);
     const sid = try X25519.KeyPair.fromEd25519(spair);
     return X25519.scalarmult(sid.secret_key, rid);
+}
+
+/// Sign data using an Identity's private key and return the signature
+pub fn sign(id: Identity, data: []const u8) Error![64]u8 {
+    if (id.secret == null) return Error.InvalidSecret;
+    const kp = try Ed25519.KeyPair.fromSecretKey(id.secret.?);
+    var noise: [Ed25519.noise_length]u8 = undefined;
+    std.crypto.random.bytes(&noise);
+    const sig = try kp.sign(data, noise);
+    return sig.toBytes();
+}
+
+/// Verify a signature and throw an error if the verification fails
+pub fn verify(id: Identity, data: []const u8, sig: [64]u8) Error!void {
+    try Ed25519.Signature.fromBytes(sig).verify(data, id.public);
 }
 
 /// Base64 encode an Identity's public or secret key for storage
