@@ -17,7 +17,7 @@ pkgs.stdenv.mkDerivation {
     mv $ZIG_GLOBAL_CACHE_DIR/p $out
   '';
 
-  outputHash = "sha256-3ASEmARI1CVBAP1R1YvnSc+xexBeivy2ga6EPrOB8w0=";
+  outputHash = "sha256-+wrqOin+0+RnP1aJe5J4YKF0LjC2SnQQa3gT4JnTeoU=";
   outputHashMode = "recursive";
   outputHashAlgo = "sha256";
 }
