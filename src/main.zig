@@ -45,4 +45,9 @@ pub fn main() !void {
         try color.write(stdout.writer(), .Default, "\n");
         std.process.exit(0);
     }
+
+    try color.write(stdout.writer(), .Red, "error: ");
+    try color.write(stdout.writer(), .Default, "unknown or invalid command");
+    try stdout.writeAll("\n");
+    std.process.exit(1);
 }
