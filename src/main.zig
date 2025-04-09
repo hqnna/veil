@@ -1,12 +1,12 @@
 const std = @import("std");
 const args = @import("args");
 const help = @import("help/help.zig");
-const Keys = @import("util/keys.zig");
 const color = @import("util/color.zig");
-const Identity = @import("crypto/identity.zig");
+const Commands = @import("util/cmds.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut();
+    const stderr = std.io.getStdErr();
     const allocator = std.heap.smp_allocator;
 
     var cli = try args.parseForCurrentProcess(struct {
@@ -22,32 +22,13 @@ pub fn main() !void {
     if (cli.options.help) try help.print(stdout, .full);
     if (cli.options.version) try help.print(stdout, .version);
     if (cli.positionals.len == 0) try help.print(stdout, .usage);
+    var commands = try Commands.create(allocator, stdout, stderr);
+    defer commands.destroy();
 
-    var keys = try Keys.init(allocator);
-    defer keys.deinit();
+    if (std.mem.eql(u8, cli.positionals[0], "init")) try commands.init();
 
-    if (std.mem.eql(u8, cli.positionals[0], "init")) {
-        if (try keys.exists()) {
-            try color.write(stdout.writer(), .Red, "error:");
-            try color.write(stdout.writer(), .Default, " ");
-            try stdout.writeAll("keys have already been initialized\n");
-            std.process.exit(1);
-        }
-
-        var keypair = Identity.generate(allocator);
-        const secret_data = try keypair.encode(.secret);
-        const public_data = try keypair.encode(.public);
-        try keys.write(.secret, secret_data);
-        try keys.write(.public, public_data);
-
-        try color.write(stdout.writer(), .Yellow, "public key: ");
-        try color.write(stdout.writer(), .Default, public_data);
-        try color.write(stdout.writer(), .Default, "\n");
-        std.process.exit(0);
-    }
-
-    try color.write(stdout.writer(), .Red, "error: ");
-    try color.write(stdout.writer(), .Default, "unknown or invalid command");
-    try stdout.writeAll("\n");
+    try color.write(stderr.writer(), .Red, "error:");
+    try color.write(stderr.writer(), .Default, " ");
+    try stderr.writeAll("invalid or unknown command\n");
     std.process.exit(1);
 }
