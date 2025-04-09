@@ -22,6 +22,7 @@ pub const Error =
         IdentityElementError,
         InvalidEncoding,
         IdentityElement,
+        InvalidSecret,
         EncodingError,
         NonCanonical,
     };
@@ -62,6 +63,7 @@ pub fn load(comptime kind: KeyType, data: []const u8) Error!Identity {
 
 /// Get a scalar from an identity's public key
 pub fn scalar(id: Identity, out: Identity) Error!Scalar {
+    if (id.secret == null) return Error.InvalidSecret;
     const spair = try Ed25519.KeyPair.fromSecretKey(id.secret.?);
     const rid = try X25519.publicKeyFromEd25519(out.public);
     const sid = try X25519.KeyPair.fromEd25519(spair);
@@ -72,6 +74,7 @@ pub fn scalar(id: Identity, out: Identity) Error!Scalar {
 pub fn encode(id: Identity, comptime kind: KeyType) Error![]const u8 {
     switch (kind) {
         .secret => {
+            if (id.secret == null) return Error.InvalidSecret;
             const size = Base64.Encoder.calcSize(id.secret.?.bytes.len);
             const buffer = try id.allocator.alloc(u8, size);
             errdefer id.allocator.free(buffer);
