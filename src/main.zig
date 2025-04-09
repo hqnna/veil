@@ -43,5 +43,6 @@ pub fn main() !void {
         try color.write(stdout.writer(), .Yellow, "public key: ");
         try color.write(stdout.writer(), .Default, public_data);
         try color.write(stdout.writer(), .Default, "\n");
+        std.process.exit(0);
     }
 }
