@@ -43,7 +43,6 @@ pub fn decrypt(c: Crypt, r: Identity, d: []const u8) Error![]const u8 {
     const tag = buffer[0..Aegis256X4.tag_length];
     const nonce = buffer[tag.len .. tag.len + Aegis256X4.nonce_length];
     const data = buffer[tag.len + nonce.len ..];
-
     const raw = try c.allocator.alloc(u8, data.len);
     errdefer c.allocator.free(raw);
 
