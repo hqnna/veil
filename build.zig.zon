@@ -13,6 +13,10 @@
             .url = "https://github.com/ziglibs/ansi_term/archive/c0e6ad0.tar.gz",
             .hash = "ansi_term-0.1.0-_baAywpoAABEqsPmS5Jz_CddDCrG8qdIyRIESH8D2fzd",
         },
+        .known_folders = .{
+            .url = "https://github.com/ziglibs/known-folders/archive/aa24df4.tar.gz",
+            .hash = "known_folders-0.0.0-Fy-PJtLDAADGDOwYwMkVydMSTp_aN-nfjCZw6qPQ2ECL",
+        },
     },
 
     .paths = .{
