@@ -62,6 +62,14 @@ pub fn read(s: Keys, comptime k: Identity.KeyType) Error![]const u8 {
     return handle.readToEndAlloc(s.allocator, std.math.maxInt(usize));
 }
 
+/// Check if a keypair already exists
+pub fn exists(s: Keys) Error!bool {
+    const k1 = try std.fs.path.join(s.allocator, &.{ s.dir, "secret.key" });
+    const k2 = try std.fs.path.join(s.allocator, &.{ s.dir, "public.key" });
+    std.fs.accessAbsolute(k1, .{ .mode = .read_only }) catch return true;
+    std.fs.accessAbsolute(k2, .{ .mode = .read_only }) catch return true;
+}
+
 /// Destroy a storage utility
 pub fn deinit(s: *Keys) void {
     s.allocator.free(s.dir);
