@@ -3,12 +3,14 @@ Created by Hanna Rose <me@hanna.lol>
 
 usage: veil [options] <command>
 
+init                  Initialize a new identity.
+
 --color=[bool]        Enable or disable colors.
 -h, --help            Show this help message text.
 --version             Show the current version.
 
 Color can also be enabled or disabled with the use
 of the NO_COLOR, VEIL_COLOR, and TERM environment
-variables. Setting NO_COLOR will disable color, as
-well as setting TERM to "dumb" will also disable it.
+variables. Setting NO_COLOR to any value or setting
+TERM to the value "dumb" will also disable color.
 You can set VEIL_COLOR to toggle color as well.

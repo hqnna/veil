@@ -44,7 +44,18 @@ fn full(stream: anytype) !void {
     try color.write(stream, .{ .Grey = 128 }, data[99..110]);
     try color.write(stream, .Default, data[110..121]);
 
-    var flags = std.mem.splitAny(u8, data[121..], "\n");
+    try color.write(stream, .Blue, "Commands\n");
+    var cmds = std.mem.splitAny(u8, data[121..], "\n");
+    while (cmds.next()) |flag| if (flag.len == 0) break else {
+        try color.write(stream, .Yellow, flag[0..22]);
+        try color.write(stream, .Default, flag[22..]);
+        try color.write(stream, .Default, "\n");
+    };
+
+    try color.write(stream, .Default, "\n");
+
+    try color.write(stream, .Blue, "Options\n");
+    var flags = std.mem.splitAny(u8, cmds.rest(), "\n");
     while (flags.next()) |flag| if (flag.len == 0) break else {
         try color.write(stream, .Yellow, flag[0..22]);
         try color.write(stream, .Default, flag[22..]);
@@ -52,5 +63,6 @@ fn full(stream: anytype) !void {
     };
 
     try color.write(stream, .Default, "\n");
+    try color.write(stream, .Blue, "Notes\n");
     try color.write(stream, .{ .Grey = 128 }, flags.rest());
 }
