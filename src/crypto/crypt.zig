@@ -14,15 +14,15 @@ pub fn init(allocator: std.mem.Allocator) Crypt {
     return Crypt{ .allocator = allocator };
 }
 
-/// Encrypt data using the specified sender and receiver identities
-pub fn encrypt(c: Crypt, s: Identity, r: Identity, d: []const u8) Error![]const u8 {
+/// Encrypt data using an identity's symmetric encryption token
+pub fn encrypt(c: Crypt, id: Identity, d: []const u8) Error![]const u8 {
     var tag: [Aegis256X4.tag_length]u8 = undefined;
     var nonce: [Aegis256X4.nonce_length]u8 = undefined;
     const data = try c.allocator.alloc(u8, d.len);
     defer c.allocator.free(data);
     std.crypto.random.bytes(&nonce);
 
-    Aegis256X4.encrypt(data, &tag, d, "", nonce, try s.scalar(r));
+    Aegis256X4.encrypt(data, &tag, d, "", nonce, try id.token());
     const msg = try std.mem.concat(c.allocator, u8, &.{ &tag, &nonce, data });
     defer c.allocator.free(msg);
 
@@ -34,7 +34,7 @@ pub fn encrypt(c: Crypt, s: Identity, r: Identity, d: []const u8) Error![]const 
 }
 
 /// Decrypt data using the specified receiver identity
-pub fn decrypt(c: Crypt, r: Identity, d: []const u8) Error![]const u8 {
+pub fn decrypt(c: Crypt, id: Identity, d: []const u8) Error![]const u8 {
     const size = try Base64.Decoder.calcSizeForSlice(d);
     const buffer = try c.allocator.alloc(u8, size);
     defer c.allocator.free(buffer);
@@ -46,6 +46,6 @@ pub fn decrypt(c: Crypt, r: Identity, d: []const u8) Error![]const u8 {
     const raw = try c.allocator.alloc(u8, data.len);
     errdefer c.allocator.free(raw);
 
-    try Aegis256X4.decrypt(raw, data, tag.*, "", nonce.*, try r.scalar(r));
+    try Aegis256X4.decrypt(raw, data, tag.*, "", nonce.*, try id.token());
     return raw;
 }
