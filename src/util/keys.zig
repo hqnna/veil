@@ -35,7 +35,7 @@ pub fn init(allocator: std.mem.Allocator) Error!Keys {
 }
 
 /// Write data to a specific type of key using a storage utility
-pub fn write(s: Keys, comptime k: Identity.KeyType, d: []const u8) Error!void {
+pub fn write(s: Keys, comptime k: Identity.Key, d: []const u8) Error!void {
     const path = try switch (k) {
         .secret => std.fs.path.join(s.allocator, &.{ s.dir, "secret.key" }),
         .public => std.fs.path.join(s.allocator, &.{ s.dir, "public.key" }),
@@ -49,7 +49,7 @@ pub fn write(s: Keys, comptime k: Identity.KeyType, d: []const u8) Error!void {
 }
 
 /// Read data from a specific type of key using a storage utility
-pub fn read(s: Keys, comptime k: Identity.KeyType) Error![]const u8 {
+pub fn read(s: Keys, comptime k: Identity.Key) Error![]const u8 {
     const path = try switch (k) {
         .secret => std.fs.path.join(s.allocator, &.{ s.dir, "secret.key" }),
         .public => std.fs.path.join(s.allocator, &.{ s.dir, "public.key" }),

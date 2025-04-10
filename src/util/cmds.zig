@@ -38,9 +38,9 @@ pub fn init(cmds: Commands) Error!void {
         std.process.exit(1);
     }
 
-    const identity = Identity.generate(cmds.allocator);
-    const secret_key = try identity.encode(.secret);
-    const public_key = try identity.encode(.public);
+    const identity = Identity.create();
+    const secret_key = try identity.encode(cmds.allocator, .secret);
+    const public_key = try identity.encode(cmds.allocator, .public);
     try cmds.keys.write(.secret, secret_key);
     try cmds.keys.write(.public, public_key);
 
