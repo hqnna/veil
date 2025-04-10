@@ -2,6 +2,7 @@ const Crypt = @This();
 const std = @import("std");
 const Identity = @import("identity.zig");
 const Aegis256X4 = std.crypto.aead.aegis.Aegis256X4;
+const Blake3 = std.crypto.hash.Blake3;
 const Base64 = std.base64.standard;
 
 allocator: std.mem.Allocator,
@@ -48,4 +49,15 @@ pub fn decrypt(c: Crypt, id: Identity, d: []const u8) Error![]const u8 {
 
     try Aegis256X4.decrypt(raw, data, tag.*, "", nonce.*, try id.token());
     return raw;
+}
+
+/// Return a hash using Blake3 and the Identity's symmetric token
+pub fn hash(c: Crypt, id: Identity, data: []const u8) Error![]const u8 {
+    var buffer: [Blake3.digest_length * 2]u8 = undefined;
+    Blake3.hash(data, &buffer, .{ .key = try id.token() });
+    buffer = std.fmt.bytesToHex(buffer[0..Blake3.digest_length], .lower);
+    const hash_copy = try c.allocator.alloc(u8, buffer.len);
+    errdefer c.allocator.free(hash_copy);
+    @memcpy(hash_copy, &buffer);
+    return hash_copy;
 }
