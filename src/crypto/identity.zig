@@ -74,9 +74,9 @@ pub fn sign(i: Identity, a: std.mem.Allocator, d: []const u8) Error![]const u8 {
 }
 
 /// Verify the signature for data using an identity's keypair
-pub fn verify(i: Identity, data: []const u8, raw: [64]u8) Error!void {
+pub fn verify(i: Identity, data: []const u8, raw: []const u8) Error!void {
     var sig: [Ed25519.Signature.encoded_length]u8 = undefined;
-    try Base64.Decoder.decode(&sig, &raw);
+    try Base64.Decoder.decode(&sig, raw);
 
     try Ed25519.Signature.fromBytes(sig).verify(data, i.public);
 }
