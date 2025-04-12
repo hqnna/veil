@@ -27,6 +27,7 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, cli.positionals[0], "init")) try cmds.init();
     if (std.mem.eql(u8, cli.positionals[0], "lock")) try cmds.lock(cli.positionals[1]);
+    if (std.mem.eql(u8, cli.positionals[0], "unlock")) try cmds.unlock(cli.positionals[1]);
 
     try color.write(stderr.writer(), .Red, "error:");
     try color.write(stderr.writer(), .Default, " ");
