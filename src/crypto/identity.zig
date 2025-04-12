@@ -60,17 +60,24 @@ pub fn token(i: Identity) Error!Scalar {
 }
 
 /// Sign data using the identity's keypair for verification
-pub fn sign(i: Identity, data: []const u8) Error![64]u8 {
+pub fn sign(i: Identity, a: std.mem.Allocator, d: []const u8) Error![]const u8 {
     const keypair = try Ed25519.KeyPair.fromSecretKey(i.secret);
     var noise: [Ed25519.noise_length]u8 = undefined;
     std.crypto.random.bytes(&noise);
 
-    const signature = try keypair.sign(data, noise);
-    return signature.toBytes();
+    const signature = try keypair.sign(d, noise);
+    const size = Base64.Encoder.calcSize(signature.toBytes().len);
+    const buffer = try a.alloc(u8, size);
+    errdefer a.free(buffer);
+
+    return Base64.Encoder.encode(buffer, &signature.toBytes());
 }
 
 /// Verify the signature for data using an identity's keypair
-pub fn verify(i: Identity, data: []const u8, sig: [64]u8) Error!void {
+pub fn verify(i: Identity, data: []const u8, raw: [64]u8) Error!void {
+    var sig: [Ed25519.Signature.encoded_length]u8 = undefined;
+    try Base64.Decoder.decode(&sig, &raw);
+
     try Ed25519.Signature.fromBytes(sig).verify(data, i.public);
 }
 
