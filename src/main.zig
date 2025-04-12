@@ -22,10 +22,11 @@ pub fn main() !void {
     if (cli.options.help) try help.print(stdout, .full);
     if (cli.options.version) try help.print(stdout, .version);
     if (cli.positionals.len == 0) try help.print(stdout, .usage);
-    var commands = try Commands.create(allocator, stdout, stderr);
-    defer commands.destroy();
+    var cmds = try Commands.create(allocator, stdout, stderr);
+    defer cmds.destroy();
 
-    if (std.mem.eql(u8, cli.positionals[0], "init")) try commands.init();
+    if (std.mem.eql(u8, cli.positionals[0], "init")) try cmds.init();
+    if (std.mem.eql(u8, cli.positionals[0], "lock")) try cmds.lock(cli.positionals[1]);
 
     try color.write(stderr.writer(), .Red, "error:");
     try color.write(stderr.writer(), .Default, " ");
