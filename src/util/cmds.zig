@@ -17,6 +17,9 @@ stderr: std.fs.File,
 /// Combination of error unions used for commands
 pub const Error = sys.Error || Keys.Error || Identity.Error || Crypt.Error;
 
+/// Encryption metadata such as the original name and the resulting hash
+pub const NameMeta = struct { old: []const u8, new: []const u8 };
+
 /// Create a new command handler instance
 pub fn create(
     allocator: std.mem.Allocator,
@@ -68,10 +71,27 @@ pub fn lock(c: Commands, path: []const u8) Error!noreturn {
 
     const info = try std.fs.cwd().statFile(path);
 
-    try switch (info.kind) {
-        .file => c.encryptFile(path),
+    switch (info.kind) {
+        .file => {
+            const meta = try c.encryptFile(path);
+            try color.write(c.stdout.writer(), .Green, "successfully ");
+            try color.write(c.stdout.writer(), .Default, "encrypted ");
+            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Default, " as ");
+            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Default, "\n");
+            std.process.exit(0);
+        },
+        .directory => {
+            const dir_name = try c.encryptDir(path);
+            try color.write(c.stdout.writer(), .Green, "successfully ");
+            try color.write(c.stdout.writer(), .Default, "encrypted ");
+            try color.write(c.stdout.writer(), .Yellow, dir_name);
+            try color.write(c.stdout.writer(), .Default, "\n");
+            std.process.exit(0);
+        },
         else => {},
-    };
+    }
 
     try color.write(c.stderr.writer(), .Red, "error:");
     try color.write(c.stderr.writer(), .Default, " ");
@@ -92,10 +112,27 @@ pub fn unlock(c: Commands, path: []const u8) Error!noreturn {
 
     const info = try std.fs.cwd().statFile(path);
 
-    try switch (info.kind) {
-        .file => c.decryptFile(path),
+    switch (info.kind) {
+        .file => {
+            const meta = try c.decryptFile(path);
+            try color.write(c.stdout.writer(), .Green, "successfully ");
+            try color.write(c.stdout.writer(), .Default, "decrypted ");
+            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Default, " as ");
+            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Default, "\n");
+            std.process.exit(0);
+        },
+        .directory => {
+            const dir_name = try c.decryptDir(path);
+            try color.write(c.stdout.writer(), .Green, "successfully ");
+            try color.write(c.stdout.writer(), .Default, "decrypted ");
+            try color.write(c.stdout.writer(), .Yellow, dir_name);
+            try color.write(c.stdout.writer(), .Default, "\n");
+            std.process.exit(0);
+        },
         else => {},
-    };
+    }
 
     try color.write(c.stderr.writer(), .Red, "error:");
     try color.write(c.stderr.writer(), .Default, " ");
@@ -110,13 +147,13 @@ pub fn destroy(c: *Commands) void {
 }
 
 // Attempt to encrypt a file at the given path
-fn encryptFile(c: Commands, path: []const u8) Error!void {
+fn encryptFile(c: Commands, path: []const u8) Error!NameMeta {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
-    defer file.unload(c.allocator);
+    errdefer file.unload(c.allocator);
 
     const hash = try c.crypt.hash(id, file.data);
-    defer c.allocator.free(hash);
+    errdefer c.allocator.free(hash);
 
     const cdata = try std.mem.concat(c.allocator, u8, &.{ file.meta.name, &.{1}, file.data });
     defer c.allocator.free(cdata);
@@ -136,24 +173,18 @@ fn encryptFile(c: Commands, path: []const u8) Error!void {
     try dir.writeFile(.{ .sub_path = hash, .data = sdata });
     try dir.deleteFile(file.meta.path);
 
-    try color.write(c.stdout.writer(), .Green, "successfully ");
-    try color.write(c.stdout.writer(), .Default, "encrypted ");
-    try color.write(c.stdout.writer(), .Yellow, file.meta.name);
-    try color.write(c.stdout.writer(), .Default, " as ");
-    try color.write(c.stdout.writer(), .Yellow, hash);
-    try color.write(c.stdout.writer(), .Default, "\n");
-    std.process.exit(0);
+    return NameMeta{ .old = file.meta.name, .new = hash };
 }
 
 // Attempt to decrypt a file at the given path
-fn decryptFile(c: Commands, path: []const u8) Error!void {
+fn decryptFile(c: Commands, path: []const u8) Error!NameMeta {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
 
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
     const data = try c.crypt.decrypt(id, file.data[0 .. file.data.len - size]);
-    defer c.allocator.free(data);
+    errdefer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
     const file_name = iterator.next();
@@ -166,11 +197,55 @@ fn decryptFile(c: Commands, path: []const u8) Error!void {
     try dir.writeFile(.{ .sub_path = file_name.?, .data = file_data });
     try dir.deleteFile(file.meta.path);
 
-    try color.write(c.stdout.writer(), .Green, "successfully ");
-    try color.write(c.stdout.writer(), .Default, "decrypted ");
-    try color.write(c.stdout.writer(), .Yellow, file.meta.name);
-    try color.write(c.stdout.writer(), .Default, " as ");
-    try color.write(c.stdout.writer(), .Yellow, file_name.?);
-    try color.write(c.stdout.writer(), .Default, "\n");
-    std.process.exit(0);
+    return NameMeta{ .old = path, .new = file_name.? };
+}
+
+// Attempt to encrypt a directory at the given path
+fn encryptDir(c: Commands, path: []const u8) Error![]const u8 {
+    var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
+    defer dir.close();
+
+    var iterator = dir.iterate();
+    while (try iterator.next()) |entry| switch (entry.kind) {
+        .directory => {
+            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
+            errdefer c.allocator.free(sub_path);
+            _ = try c.encryptDir(sub_path);
+        },
+        .file => {
+            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
+            errdefer c.allocator.free(sub_path);
+            _ = try c.encryptFile(sub_path);
+        },
+        else => continue,
+    };
+
+    const rpath = try dir.realpathAlloc(c.allocator, ".");
+    errdefer c.allocator.free(rpath);
+    return rpath;
+}
+
+// Attempt to decrypt a directory at the given path
+fn decryptDir(c: Commands, path: []const u8) Error![]const u8 {
+    var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
+    defer dir.close();
+
+    var iterator = dir.iterate();
+    while (try iterator.next()) |entry| switch (entry.kind) {
+        .directory => {
+            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
+            errdefer c.allocator.free(sub_path);
+            _ = try c.decryptDir(sub_path);
+        },
+        .file => {
+            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
+            errdefer c.allocator.free(sub_path);
+            _ = try c.decryptFile(sub_path);
+        },
+        else => continue,
+    };
+
+    const rpath = try dir.realpathAlloc(c.allocator, ".");
+    errdefer c.allocator.free(rpath);
+    return rpath;
 }
