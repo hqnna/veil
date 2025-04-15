@@ -60,7 +60,7 @@ pub fn decrypt(c: Crypt, id: Identity, d: []const u8, e: Encoding) Error![]const
             try Base64.Decoder.decode(buffer, d);
         },
         .hex => {
-            buffer = try c.allocator.alloc(u8, d.len * 2);
+            buffer = try c.allocator.alloc(u8, d.len / 2);
             errdefer c.allocator.free(buffer);
             _ = try std.fmt.hexToBytes(buffer, d);
         },
