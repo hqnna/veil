@@ -53,7 +53,7 @@ pub fn init(c: Commands) Error!noreturn {
     try c.keys.write(.secret, secret_key);
     try c.keys.write(.public, public_key);
 
-    try color.write(c.stdout.writer(), .Yellow, "public key: ");
+    try color.write(c.stdout.writer(), .Green, "public key: ");
     try color.write(c.stdout.writer(), .Default, public_key);
     try c.stdout.writeAll("\n");
     std.process.exit(0);
@@ -76,9 +76,9 @@ pub fn lock(c: Commands, path: []const u8) Error!noreturn {
             const meta = try c.encryptFile(path);
             try color.write(c.stdout.writer(), .Green, "successfully ");
             try color.write(c.stdout.writer(), .Default, "encrypted ");
-            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Green, meta.old);
             try color.write(c.stdout.writer(), .Default, " as ");
-            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Green, meta.new);
             try color.write(c.stdout.writer(), .Default, "\n");
             std.process.exit(0);
         },
@@ -86,9 +86,9 @@ pub fn lock(c: Commands, path: []const u8) Error!noreturn {
             const meta = try c.encryptDir(path);
             try color.write(c.stdout.writer(), .Green, "successfully ");
             try color.write(c.stdout.writer(), .Default, "encrypted ");
-            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Green, meta.old);
             try color.write(c.stdout.writer(), .Default, " as ");
-            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Green, meta.new);
             try color.write(c.stdout.writer(), .Default, "\n");
             std.process.exit(0);
         },
@@ -119,9 +119,9 @@ pub fn unlock(c: Commands, path: []const u8) Error!noreturn {
             const meta = try c.decryptFile(path);
             try color.write(c.stdout.writer(), .Green, "successfully ");
             try color.write(c.stdout.writer(), .Default, "decrypted ");
-            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Green, meta.old);
             try color.write(c.stdout.writer(), .Default, " as ");
-            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Green, meta.new);
             try color.write(c.stdout.writer(), .Default, "\n");
             std.process.exit(0);
         },
@@ -129,9 +129,9 @@ pub fn unlock(c: Commands, path: []const u8) Error!noreturn {
             const meta = try c.decryptDir(path);
             try color.write(c.stdout.writer(), .Green, "successfully ");
             try color.write(c.stdout.writer(), .Default, "decrypted ");
-            try color.write(c.stdout.writer(), .Yellow, meta.old);
+            try color.write(c.stdout.writer(), .Green, meta.old);
             try color.write(c.stdout.writer(), .Default, " as ");
-            try color.write(c.stdout.writer(), .Yellow, meta.new);
+            try color.write(c.stdout.writer(), .Green, meta.new);
             try color.write(c.stdout.writer(), .Default, "\n");
             std.process.exit(0);
         },

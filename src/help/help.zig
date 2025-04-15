@@ -22,15 +22,15 @@ pub fn print(stream: std.fs.File, kind: HelpType) !void {
 
 // Print the version string to a stream
 fn version(stream: anytype) !void {
-    try color.write(stream, .Yellow, "veil");
+    try color.write(stream, .Green, "veil");
     try color.write(stream, .Default, " version ");
-    try color.write(stream, .Yellow, ver_str);
+    try color.write(stream, .Green, ver_str);
     try color.write(stream, .Default, "\n");
 }
 
 // Print the usage string to a stream
 fn usage(stream: anytype) !void {
-    try color.write(stream, .Yellow, data[88..95]);
+    try color.write(stream, .Green, data[88..95]);
     try color.write(stream, .Default, data[95..99]);
     try color.write(stream, .{ .Grey = 128 }, data[99..110]);
     try color.write(stream, .Default, data[110..120]);
@@ -39,7 +39,7 @@ fn usage(stream: anytype) !void {
 // Print the full message string to a stream
 fn full(stream: anytype) !void {
     try color.write(stream, .Default, data[0..88]);
-    try color.write(stream, .Yellow, data[88..95]);
+    try color.write(stream, .Green, data[88..95]);
     try color.write(stream, .Default, data[95..99]);
     try color.write(stream, .{ .Grey = 128 }, data[99..110]);
     try color.write(stream, .Default, data[110..121]);
@@ -47,7 +47,7 @@ fn full(stream: anytype) !void {
     try color.write(stream, .Blue, "Commands\n");
     var cmds = std.mem.splitAny(u8, data[121..], "\n");
     while (cmds.next()) |flag| if (flag.len == 0) break else {
-        try color.write(stream, .Yellow, flag[0..22]);
+        try color.write(stream, .Green, flag[0..22]);
         try color.write(stream, .Default, flag[22..]);
         try color.write(stream, .Default, "\n");
     };
@@ -57,7 +57,7 @@ fn full(stream: anytype) !void {
     try color.write(stream, .Blue, "Options\n");
     var flags = std.mem.splitAny(u8, cmds.rest(), "\n");
     while (flags.next()) |flag| if (flag.len == 0) break else {
-        try color.write(stream, .Yellow, flag[0..22]);
+        try color.write(stream, .Green, flag[0..22]);
         try color.write(stream, .Default, flag[22..]);
         try color.write(stream, .Default, "\n");
     };
