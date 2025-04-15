@@ -4,6 +4,8 @@ Created by Hanna Rose <me@hanna.lol>
 usage: veil [options] <command>
 
 init                  Initialize a new identity.
+lock <path>           Encrypt a file or directory.
+unlock <path>         Decrypt a file or directory.
 
 --color=[bool]        Enable or disable colors.
 -h, --help            Show this help message text.
