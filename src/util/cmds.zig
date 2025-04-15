@@ -158,7 +158,7 @@ fn encryptFile(c: Commands, path: []const u8) Error!NameMeta {
     const cdata = try std.mem.concat(c.allocator, u8, &.{ file.meta.name, &.{1}, file.data });
     defer c.allocator.free(cdata);
 
-    const data = try c.crypt.encrypt(id, cdata);
+    const data = try c.crypt.encrypt(id, cdata, .b64);
     defer c.allocator.free(data);
 
     const sig = try id.sign(c.allocator, file.data);
@@ -183,7 +183,7 @@ fn decryptFile(c: Commands, path: []const u8) Error!NameMeta {
     defer file.unload(c.allocator);
 
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
-    const data = try c.crypt.decrypt(id, file.data[0 .. file.data.len - size]);
+    const data = try c.crypt.decrypt(id, file.data[0 .. file.data.len - size], .b64);
     errdefer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
