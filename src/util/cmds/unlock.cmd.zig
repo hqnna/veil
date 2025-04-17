@@ -6,9 +6,6 @@ const Identity = @import("../../crypto/identity.zig");
 const Ed25519 = std.crypto.sign.Ed25519;
 const Base64 = std.base64.standard;
 
-// Encryption metadata such as the original name and the resulting hash
-const Rename = struct { old: []const u8, new: []const u8 };
-
 /// Attempt to decrypt a folder or file at a specified path
 pub fn call(c: Command, path: []const u8) Command.Error!u8 {
     std.fs.cwd().access(path, .{}) catch {
@@ -22,14 +19,20 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 
     switch (info.kind) {
         .file => {
-            const meta = try decryptFile(c, path);
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "decrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+            if (try decryptFile(c, path)) |meta| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "decrypted ");
+                try write(c.stdout.writer(), .Green, meta.old);
+                try write(c.stdout.writer(), .Default, " as ");
+                try write(c.stdout.writer(), .Green, meta.new);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            } else {
+                try write(c.stderr.writer(), .Red, "error:");
+                try write(c.stderr.writer(), .Default, " ");
+                try c.stderr.writeAll("the file has not been encrypted\n");
+                return 1;
+            }
         },
         .directory => {
             const meta = try decryptDir(c, path);
@@ -51,13 +54,15 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to decrypt a file at the given path
-fn decryptFile(c: Command, path: []const u8) Command.Error!Rename {
+fn decryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
 
+    if (!std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
+
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
-    const data = try c.crypt.decrypt(id, file.data[0 .. file.data.len - size], .b64);
+    const data = try c.crypt.decrypt(id, file.data[5 .. file.data.len - size], .b64);
     errdefer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
@@ -71,11 +76,11 @@ fn decryptFile(c: Command, path: []const u8) Command.Error!Rename {
     try dir.writeFile(.{ .sub_path = file_name.?, .data = file_data });
     try dir.deleteFile(file.meta.path);
 
-    return Rename{ .old = path, .new = file_name.? };
+    return .{ .old = path, .new = file_name.? };
 }
 
 // Attempt to decrypt a directory at the given path
-fn decryptDir(c: Command, path: []const u8) Command.Error!Rename {
+fn decryptDir(c: Command, path: []const u8) Command.Error!sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
@@ -107,5 +112,5 @@ fn decryptDir(c: Command, path: []const u8) Command.Error!Rename {
     errdefer c.allocator.free(npath);
 
     try std.fs.renameAbsolute(rpath, npath);
-    return Rename{ .old = name, .new = ename };
+    return .{ .old = name, .new = ename };
 }

@@ -4,9 +4,6 @@ const Command = @import("../cmds.zig");
 const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
 
-// Encryption metadata such as the original name and the resulting hash
-const Rename = struct { old: []const u8, new: []const u8 };
-
 /// Attempt to encrypt a folder or file at a specified path
 pub fn call(c: Command, path: []const u8) Command.Error!u8 {
     std.fs.cwd().access(path, .{}) catch {
@@ -20,14 +17,20 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 
     switch (info.kind) {
         .file => {
-            const meta = try encryptFile(c, path);
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "encrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+            if (try encryptFile(c, path)) |meta| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "encrypted ");
+                try write(c.stdout.writer(), .Green, meta.old);
+                try write(c.stdout.writer(), .Default, " as ");
+                try write(c.stdout.writer(), .Green, meta.new);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            } else {
+                try write(c.stderr.writer(), .Red, "error:");
+                try write(c.stderr.writer(), .Default, " ");
+                try c.stderr.writeAll("the file is already encrypted\n");
+                return 1;
+            }
         },
         .directory => {
             const meta = try encryptDir(c, path);
@@ -49,10 +52,12 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to encrypt a file at the given path
-fn encryptFile(c: Command, path: []const u8) Command.Error!Rename {
+fn encryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     errdefer file.unload(c.allocator);
+
+    if (std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
 
     const hash = try c.crypt.hash(id, file.data);
     errdefer c.allocator.free(hash);
@@ -66,7 +71,7 @@ fn encryptFile(c: Command, path: []const u8) Command.Error!Rename {
     const sig = try id.sign(c.allocator, file.data);
     defer c.allocator.free(sig);
 
-    const sdata = try std.mem.concat(c.allocator, u8, &.{ data, sig });
+    const sdata = try std.mem.concat(c.allocator, u8, &.{ &sys.magic, data, sig });
     defer c.allocator.free(sdata);
 
     var dir = try std.fs.openDirAbsolute(file.meta.dir, .{});
@@ -75,11 +80,11 @@ fn encryptFile(c: Command, path: []const u8) Command.Error!Rename {
     try dir.writeFile(.{ .sub_path = hash, .data = sdata });
     try dir.deleteFile(file.meta.path);
 
-    return Rename{ .old = file.meta.name, .new = hash };
+    return .{ .old = file.meta.name, .new = hash };
 }
 
 // Attempt to encrypt a directory at the given path
-fn encryptDir(c: Command, path: []const u8) Command.Error!Rename {
+fn encryptDir(c: Command, path: []const u8) Command.Error!sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
@@ -111,5 +116,5 @@ fn encryptDir(c: Command, path: []const u8) Command.Error!Rename {
     errdefer c.allocator.free(npath);
 
     try std.fs.renameAbsolute(rpath, npath);
-    return Rename{ .old = name, .new = ename };
+    return .{ .old = name, .new = ename };
 }
