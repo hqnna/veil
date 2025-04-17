@@ -18,21 +18,19 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
     const info = try std.fs.cwd().statFile(path);
 
     switch (info.kind) {
-        .file => {
-            if (try decryptFile(c, path)) |meta| {
-                try write(c.stdout.writer(), .Green, "successfully ");
-                try write(c.stdout.writer(), .Default, "decrypted ");
-                try write(c.stdout.writer(), .Green, meta.old);
-                try write(c.stdout.writer(), .Default, " as ");
-                try write(c.stdout.writer(), .Green, meta.new);
-                try write(c.stdout.writer(), .Default, "\n");
-                return 0;
-            } else {
-                try write(c.stderr.writer(), .Red, "error:");
-                try write(c.stderr.writer(), .Default, " ");
-                try c.stderr.writeAll("the file has not been encrypted\n");
-                return 1;
-            }
+        .file => if (try decryptFile(c, path)) |meta| {
+            try write(c.stdout.writer(), .Green, "successfully ");
+            try write(c.stdout.writer(), .Default, "decrypted ");
+            try write(c.stdout.writer(), .Green, meta.old);
+            try write(c.stdout.writer(), .Default, " as ");
+            try write(c.stdout.writer(), .Green, meta.new);
+            try write(c.stdout.writer(), .Default, "\n");
+            return 0;
+        } else {
+            try write(c.stderr.writer(), .Red, "error:");
+            try write(c.stderr.writer(), .Default, " ");
+            try c.stderr.writeAll("the file has not been encrypted\n");
+            return 1;
         },
         .directory => {
             const meta = try decryptDir(c, path);
