@@ -3,7 +3,7 @@ const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
 
 // Attempt to initialize a new user identity
-pub fn call(c: Command) Command.Error!u8 {
+pub fn call(c: *Command) Command.Error!u8 {
     if (try c.keys.exists()) {
         try write(c.stderr.writer(), .Red, "error:");
         try write(c.stderr.writer(), .Default, " ");

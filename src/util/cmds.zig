@@ -41,7 +41,7 @@ pub fn init(
 }
 
 /// Evaluate the arguments passed to the command line interface
-pub fn eval(c: Commands, args: [][:0]const u8) Error!noreturn {
+pub fn eval(c: *Commands, args: [][:0]const u8) Error!noreturn {
     if (std.mem.eql(u8, args[0], "init")) {
         std.process.exit(try initCmd.call(c));
     } else if (std.mem.eql(u8, args[0], "lock")) {

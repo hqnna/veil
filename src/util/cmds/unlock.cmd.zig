@@ -7,7 +7,7 @@ const Ed25519 = std.crypto.sign.Ed25519;
 const Base64 = std.base64.standard;
 
 /// Attempt to decrypt a folder or file at a specified path
-pub fn call(c: Command, path: []const u8) Command.Error!u8 {
+pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
     std.fs.cwd().access(path, .{}) catch {
         try write(c.stderr.writer(), .Red, "error:");
         try write(c.stderr.writer(), .Default, " ");
@@ -52,7 +52,7 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to decrypt a file at the given path
-fn decryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
+fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
@@ -78,7 +78,7 @@ fn decryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
 }
 
 // Attempt to decrypt a directory at the given path
-fn decryptDir(c: Command, path: []const u8) Command.Error!sys.Rename {
+fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();

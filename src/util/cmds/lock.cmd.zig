@@ -5,7 +5,7 @@ const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
 
 /// Attempt to encrypt a folder or file at a specified path
-pub fn call(c: Command, path: []const u8) Command.Error!u8 {
+pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
     std.fs.cwd().access(path, .{}) catch {
         try write(c.stderr.writer(), .Red, "error:");
         try write(c.stderr.writer(), .Default, " ");
@@ -50,7 +50,7 @@ pub fn call(c: Command, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to encrypt a file at the given path
-fn encryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
+fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     errdefer file.unload(c.allocator);
@@ -82,7 +82,7 @@ fn encryptFile(c: Command, path: []const u8) Command.Error!?sys.Rename {
 }
 
 // Attempt to encrypt a directory at the given path
-fn encryptDir(c: Command, path: []const u8) Command.Error!sys.Rename {
+fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
