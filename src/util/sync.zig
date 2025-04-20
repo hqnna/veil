@@ -15,5 +15,12 @@ pub fn Box(comptime T: type) type {
                 .state = value,
             };
         }
+
+        /// Get the internal state
+        pub fn get(self: *Self) *T {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return &self.state;
+        }
     };
 }
