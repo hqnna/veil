@@ -97,13 +97,17 @@ fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     var group = std.Thread.WaitGroup{};
     var iterator = Box(std.fs.Dir.Iterator).init(dir.iterate());
 
-    c.mutex.lock();
-    while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
-        _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator });
+    if (c.threads.allowed == 1) {
+        try worker(c, &dir, &group, &iterator);
+    } else {
+        c.mutex.lock();
+        while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
+            _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator });
+        }
+        c.mutex.unlock();
     }
-    c.mutex.unlock();
-    group.wait();
 
+    group.wait();
     const rpath = try dir.realpathAlloc(c.allocator, ".");
     defer c.allocator.free(rpath);
 
@@ -135,10 +139,12 @@ fn worker(
     wg.start();
 
     defer {
-        c.mutex.lock();
-        c.threads.used -= 1;
-        c.mutex.unlock();
         wg.finish();
+        if (c.threads.allowed > 1) {
+            c.mutex.lock();
+            c.threads.used -= 1;
+            c.mutex.unlock();
+        }
     }
 
     while (try it.get().next()) |entry| switch (entry.kind) {

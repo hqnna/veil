@@ -37,6 +37,7 @@ pub fn init(
     allocator: std.mem.Allocator,
     stdout: std.fs.File,
     stderr: std.fs.File,
+    threads: ?usize,
 ) Error!Commands {
     var keys = try Keys.init(allocator);
     errdefer keys.deinit();
@@ -49,7 +50,7 @@ pub fn init(
         .stderr = stderr,
         .keys = keys,
         .threads = .{
-            .allowed = try std.Thread.getCpuCount(),
+            .allowed = threads orelse try std.Thread.getCpuCount(),
             .used = 0,
         },
     };

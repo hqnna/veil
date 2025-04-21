@@ -8,6 +8,7 @@ lock <path>           Encrypt a file or directory.
 unlock <path>         Decrypt a file or directory.
 
 --color=[bool]        Enable or disable colors.
+-t, --threads=[int]   Set the number of threads.
 -h, --help            Show this help message text.
 --version             Show the current version.
 
