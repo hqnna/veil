@@ -38,7 +38,7 @@ decrypted contents before saving.
 Veil takes advantages of multiple technologies, primarily the following:
 1. **Ed25519** for user identities and keypairs, as well as signing encrypted data.
 2. **X25519** keys are derived from the user's identity and are used to create keys.
-3. **Aegis256x4** is used for actually encryption of file data and directory names.
+3. **Aegis256x4** is used for actual encryption of file data and directory names.
 4. **Blake3** is used to hash file names, with original names being encrypted.
 5. **Base64** and **Hex** to encode data that has been encrypted for storage.
 
