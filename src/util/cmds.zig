@@ -17,10 +17,15 @@ crypt: Crypt,
 stdout: std.fs.File,
 stderr: std.fs.File,
 allocator: std.mem.Allocator,
+mutex: std.Thread.Mutex,
+threads: struct {
+    allowed: usize,
+    used: usize,
+},
 
 /// Combination of error unions used for commands
 pub const Error = Identity.Error || Crypt.Error || Keys.Error || sys.Error ||
-    error{RenameAcrossMountPoints};
+    std.Thread.SpawnError || std.Thread.CpuCountError || error{RenameAcrossMountPoints};
 
 /// Create a new command handler instance
 pub fn init(
@@ -33,10 +38,15 @@ pub fn init(
 
     return Commands{
         .crypt = Crypt.init(allocator),
+        .mutex = std.Thread.Mutex{},
         .allocator = allocator,
         .stdout = stdout,
         .stderr = stderr,
         .keys = keys,
+        .threads = .{
+            .allowed = try std.Thread.getCpuCount(),
+            .used = 0,
+        },
     };
 }
 

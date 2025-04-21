@@ -3,6 +3,7 @@ const sys = @import("../system.zig");
 const Command = @import("../cmds.zig");
 const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
+const Box = @import("../sync.zig").Box;
 
 /// Attempt to encrypt a folder or file at a specified path
 pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
@@ -53,14 +54,17 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
 fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     const id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
-    errdefer file.unload(c.allocator);
+    defer file.unload(c.allocator);
 
     if (std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
+
+    const name = try c.allocator.dupe(u8, file.meta.name);
+    errdefer c.allocator.free(name);
 
     const hash = try c.crypt.hash(id, file.data);
     errdefer c.allocator.free(hash);
 
-    const cdata = try std.mem.concat(c.allocator, u8, &.{ file.meta.name, &.{1}, file.data });
+    const cdata = try std.mem.concat(c.allocator, u8, &.{ name, &.{1}, file.data });
     defer c.allocator.free(cdata);
 
     const data = try c.crypt.encrypt(id, cdata, .b64);
@@ -78,7 +82,7 @@ fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     try dir.writeFile(.{ .sub_path = hash, .data = sdata });
     try dir.deleteFile(file.meta.path);
 
-    return .{ .old = file.meta.name, .new = hash };
+    return .{ .old = name, .new = hash };
 }
 
 // Attempt to encrypt a directory at the given path
@@ -87,32 +91,64 @@ fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
 
-    var iterator = dir.iterate();
-    while (try iterator.next()) |entry| switch (entry.kind) {
-        .directory => {
-            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
-            errdefer c.allocator.free(sub_path);
-            _ = try encryptDir(c, sub_path);
-        },
-        .file => {
-            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
-            errdefer c.allocator.free(sub_path);
-            _ = try encryptFile(c, sub_path);
-        },
-        else => continue,
-    };
+    var group = std.Thread.WaitGroup{};
+    var iterator = Box(std.fs.Dir.Iterator).init(dir.iterate());
+
+    c.mutex.lock();
+    while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
+        _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator });
+    }
+    c.mutex.unlock();
+    group.wait();
 
     const rpath = try dir.realpathAlloc(c.allocator, ".");
-    errdefer c.allocator.free(rpath);
+    defer c.allocator.free(rpath);
 
-    const name = std.fs.path.basename(rpath);
+    const name_buf = std.fs.path.basename(rpath);
+    const name = try c.allocator.dupe(u8, name_buf);
+    errdefer c.allocator.free(name);
+
     const parent = std.fs.path.dirname(rpath);
     const ename = try c.crypt.encrypt(id, name, .hex);
     errdefer c.allocator.free(ename);
 
     const npath = try std.fs.path.join(c.allocator, &.{ parent.?, ename });
-    errdefer c.allocator.free(npath);
+    defer c.allocator.free(npath);
 
     try std.fs.renameAbsolute(rpath, npath);
     return .{ .old = name, .new = ename };
+}
+
+fn worker(
+    c: *Command,
+    d: *std.fs.Dir,
+    wg: *std.Thread.WaitGroup,
+    it: *Box(std.fs.Dir.Iterator),
+) Command.Error!void {
+    wg.start();
+
+    defer {
+        c.mutex.lock();
+        c.threads.used -= 1;
+        c.mutex.unlock();
+        wg.finish();
+    }
+
+    while (try it.get().next()) |entry| switch (entry.kind) {
+        .directory => {
+            const sub_path = try d.realpathAlloc(c.allocator, entry.name);
+            defer c.allocator.free(sub_path);
+            const meta = try encryptDir(c, sub_path);
+            c.allocator.free(meta.old);
+            c.allocator.free(meta.new);
+        },
+        .file => {
+            const sub_path = try d.realpathAlloc(c.allocator, entry.name);
+            defer c.allocator.free(sub_path);
+            const meta = try encryptFile(c, sub_path);
+            if (meta) |m| c.allocator.free(m.old);
+            if (meta) |m| c.allocator.free(m.new);
+        },
+        else => continue,
+    };
 }
