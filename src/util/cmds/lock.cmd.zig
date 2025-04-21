@@ -82,7 +82,10 @@ fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     try dir.writeFile(.{ .sub_path = hash, .data = sdata });
     try dir.deleteFile(file.meta.path);
 
-    return .{ .old = name, .new = hash };
+    return sys.Rename{
+        .old = name,
+        .new = hash,
+    };
 }
 
 // Attempt to encrypt a directory at the given path
@@ -105,18 +108,22 @@ fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     defer c.allocator.free(rpath);
 
     const name_buf = std.fs.path.basename(rpath);
-    const name = try c.allocator.dupe(u8, name_buf);
-    errdefer c.allocator.free(name);
+    const old_name = try c.allocator.dupe(u8, name_buf);
+    errdefer c.allocator.free(old_name);
 
     const parent = std.fs.path.dirname(rpath);
-    const ename = try c.crypt.encrypt(id, name, .hex);
-    errdefer c.allocator.free(ename);
+    const new_name = try c.crypt.encrypt(id, old_name, .hex);
+    errdefer c.allocator.free(new_name);
 
-    const npath = try std.fs.path.join(c.allocator, &.{ parent.?, ename });
+    const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
     defer c.allocator.free(npath);
 
     try std.fs.renameAbsolute(rpath, npath);
-    return .{ .old = name, .new = ename };
+
+    return sys.Rename{
+        .old = old_name,
+        .new = new_name,
+    };
 }
 
 fn worker(
