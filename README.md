@@ -33,6 +33,24 @@ successfully decrypted d22c79d53c55d9c11c46b8cb956e40faef538ae4b7df355c0d5ad1e6e
 This will decrypt the file and restore the original file name, it verifies the
 decrypted contents before saving.
 
+## Security information
+
+Veil takes advantages of multiple technologies, primarily the following:
+1. **Ed25519** for user identities and keypairs, as well as signing encrypted data.
+2. **X25519** keys are derived from the user's identity and are used to create keys.
+3. **Aegis256x4** is used for actually encryption of file data and directory names.
+4. **Blake3** is used to hash file names, with original names being encrypted.
+5. **Base64** and **Hex** to encode data that has been encrypted for storage.
+
+### How to report security issues
+
+If you find a security vulnerability in Veil, please [email me](mailto:me@hanna.lol)
+directly and I will research a fix. **Do not** report security vulnerabilities
+on the public email list where they can be easily exposed and visible. I *might*
+offer bounties for people who find vulnerabilities that entirely compromise the
+integrity of the software, but for most vulnerabilities there will not be one
+due to this being a hobby project.
+
 ## Building from source
 
 The recommended way to build from source is to use the [flake](flake.nix) and
