@@ -24,8 +24,13 @@ threads: struct {
 },
 
 /// Combination of error unions used for commands
-pub const Error = Identity.Error || Crypt.Error || Keys.Error || sys.Error ||
-    std.Thread.SpawnError || std.Thread.CpuCountError || error{RenameAcrossMountPoints};
+pub const Error = error{RenameAcrossMountPoints} ||
+    std.Thread.CpuCountError ||
+    std.Thread.SpawnError ||
+    Identity.Error ||
+    Crypt.Error ||
+    Keys.Error ||
+    sys.Error;
 
 /// Create a new command handler instance
 pub fn init(
