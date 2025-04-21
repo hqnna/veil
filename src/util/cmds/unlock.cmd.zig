@@ -4,6 +4,7 @@ const Command = @import("../cmds.zig");
 const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
 const Ed25519 = std.crypto.sign.Ed25519;
+const Box = @import("../sync.zig").Box;
 const Base64 = std.base64.standard;
 
 /// Attempt to decrypt a folder or file at a specified path
@@ -61,20 +62,27 @@ fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
 
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
     const data = try c.crypt.decrypt(id, file.data[5 .. file.data.len - size], .b64);
-    errdefer c.allocator.free(data);
+    defer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
-    const file_name = iterator.next();
+
+    const old_name = try c.allocator.dupe(u8, file.meta.name);
+    errdefer c.allocator.free(old_name);
+    const new_name = try c.allocator.dupe(u8, iterator.next().?);
+    errdefer c.allocator.free(new_name);
     const file_data = iterator.rest();
 
     try id.verify(file_data, file.data[file.data.len - size ..]);
     var dir = try std.fs.openDirAbsolute(file.meta.dir, .{});
     defer dir.close();
 
-    try dir.writeFile(.{ .sub_path = file_name.?, .data = file_data });
+    try dir.writeFile(.{ .sub_path = new_name, .data = file_data });
     try dir.deleteFile(file.meta.path);
 
-    return .{ .old = path, .new = file_name.? };
+    return sys.Rename{
+        .old = old_name,
+        .new = new_name,
+    };
 }
 
 // Attempt to decrypt a directory at the given path
@@ -83,32 +91,68 @@ fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
 
-    var iterator = dir.iterate();
-    while (try iterator.next()) |entry| switch (entry.kind) {
-        .directory => {
-            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
-            errdefer c.allocator.free(sub_path);
-            _ = try decryptDir(c, sub_path);
-        },
+    var group = std.Thread.WaitGroup{};
+    var iterator = Box(std.fs.Dir.Iterator).init(dir.iterate());
+
+    c.mutex.lock();
+    while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
+        _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator });
+    }
+    c.mutex.unlock();
+    group.wait();
+
+    const rpath = try dir.realpathAlloc(c.allocator, ".");
+    defer c.allocator.free(rpath);
+
+    const name_buf = std.fs.path.basename(rpath);
+    const old_name = try c.allocator.dupe(u8, name_buf);
+    errdefer c.allocator.free(old_name);
+
+    const parent = std.fs.path.dirname(rpath);
+    const new_name = try c.crypt.decrypt(id, old_name, .hex);
+    errdefer c.allocator.free(new_name);
+
+    const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
+    defer c.allocator.free(npath);
+
+    try std.fs.renameAbsolute(rpath, npath);
+
+    return sys.Rename{
+        .old = old_name,
+        .new = new_name,
+    };
+}
+
+fn worker(
+    c: *Command,
+    d: *std.fs.Dir,
+    wg: *std.Thread.WaitGroup,
+    it: *Box(std.fs.Dir.Iterator),
+) Command.Error!void {
+    wg.start();
+
+    defer {
+        c.mutex.lock();
+        c.threads.used -= 1;
+        c.mutex.unlock();
+        wg.finish();
+    }
+
+    while (try it.get().next()) |entry| switch (entry.kind) {
         .file => {
-            const sub_path = try dir.realpathAlloc(c.allocator, entry.name);
-            errdefer c.allocator.free(sub_path);
-            _ = try decryptFile(c, sub_path);
+            const sub_path = try d.realpathAlloc(c.allocator, entry.name);
+            defer c.allocator.free(sub_path);
+            const meta = try decryptFile(c, sub_path);
+            if (meta) |m| c.allocator.free(m.old);
+            if (meta) |m| c.allocator.free(m.new);
+        },
+        .directory => {
+            const sub_path = try d.realpathAlloc(c.allocator, entry.name);
+            defer c.allocator.free(sub_path);
+            const meta = try decryptDir(c, sub_path);
+            c.allocator.free(meta.old);
+            c.allocator.free(meta.new);
         },
         else => continue,
     };
-
-    const rpath = try dir.realpathAlloc(c.allocator, ".");
-    errdefer c.allocator.free(rpath);
-
-    const name = std.fs.path.basename(rpath);
-    const parent = std.fs.path.dirname(rpath);
-    const ename = try c.crypt.decrypt(id, name, .hex);
-    errdefer c.allocator.free(ename);
-
-    const npath = try std.fs.path.join(c.allocator, &.{ parent.?, ename });
-    errdefer c.allocator.free(npath);
-
-    try std.fs.renameAbsolute(rpath, npath);
-    return .{ .old = name, .new = ename };
 }
