@@ -6,6 +6,7 @@ const Base64 = std.base64.standard;
 
 secret: Ed25519.SecretKey,
 public: Ed25519.PublicKey,
+mutex: std.Thread.Mutex,
 
 /// A scalar used for symmetric encryption
 pub const Scalar = [X25519.shared_length]u8;
@@ -35,6 +36,7 @@ pub fn create() Identity {
     return Identity{
         .secret = keypair.secret_key,
         .public = keypair.public_key,
+        .mutex = std.Thread.Mutex{},
     };
 }
 
@@ -49,18 +51,23 @@ pub fn load(encoded: []const u8) Error!Identity {
     return Identity{
         .secret = keypair.secret_key,
         .public = keypair.public_key,
+        .mutex = std.Thread.Mutex{},
     };
 }
 
 /// Get the symmetric encryption token
-pub fn token(i: Identity) Error!Scalar {
+pub fn token(i: *Identity) Error!Scalar {
+    i.mutex.lock();
+    defer i.mutex.unlock();
     const keypair = try Ed25519.KeyPair.fromSecretKey(i.secret);
     const x25519 = try X25519.KeyPair.fromEd25519(keypair);
     return X25519.scalarmult(x25519.secret_key, x25519.public_key);
 }
 
 /// Sign data using the identity's keypair for verification
-pub fn sign(i: Identity, a: std.mem.Allocator, d: []const u8) Error![]const u8 {
+pub fn sign(i: *Identity, a: std.mem.Allocator, d: []const u8) Error![]const u8 {
+    i.mutex.lock();
+    defer i.mutex.unlock();
     const keypair = try Ed25519.KeyPair.fromSecretKey(i.secret);
     var noise: [Ed25519.noise_length]u8 = undefined;
     std.crypto.random.bytes(&noise);
@@ -74,7 +81,9 @@ pub fn sign(i: Identity, a: std.mem.Allocator, d: []const u8) Error![]const u8 {
 }
 
 /// Verify the signature for data using an identity's keypair
-pub fn verify(i: Identity, data: []const u8, raw: []const u8) Error!void {
+pub fn verify(i: *Identity, data: []const u8, raw: []const u8) Error!void {
+    i.mutex.lock();
+    defer i.mutex.unlock();
     var sig: [Ed25519.Signature.encoded_length]u8 = undefined;
     try Base64.Decoder.decode(&sig, raw);
 
@@ -82,7 +91,10 @@ pub fn verify(i: Identity, data: []const u8, raw: []const u8) Error!void {
 }
 
 /// Encode an identity's secret or public key in Base64 for storage
-pub fn encode(i: Identity, allocator: std.mem.Allocator, key: Key) Error![]const u8 {
+pub fn encode(i: *Identity, allocator: std.mem.Allocator, key: Key) Error![]const u8 {
+    i.mutex.lock();
+    defer i.mutex.unlock();
+
     const buffer = try allocator.alloc(u8, switch (key) {
         .secret => Base64.Encoder.calcSize(i.secret.bytes.len),
         .public => Base64.Encoder.calcSize(i.public.bytes.len),

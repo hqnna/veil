@@ -19,7 +19,7 @@ pub fn init(allocator: std.mem.Allocator) Crypt {
 }
 
 /// Encrypt data using an identity's symmetric encryption token
-pub fn encrypt(c: Crypt, id: Identity, d: []const u8, e: Encoding) Error![]const u8 {
+pub fn encrypt(c: Crypt, id: *Identity, d: []const u8, e: Encoding) Error![]const u8 {
     var tag: [Aegis256X4.tag_length]u8 = undefined;
     var nonce: [Aegis256X4.nonce_length]u8 = undefined;
     const data = try c.allocator.alloc(u8, d.len);
@@ -49,7 +49,7 @@ pub fn encrypt(c: Crypt, id: Identity, d: []const u8, e: Encoding) Error![]const
 }
 
 /// Decrypt data using the specified receiver identity
-pub fn decrypt(c: Crypt, id: Identity, d: []const u8, e: Encoding) Error![]const u8 {
+pub fn decrypt(c: Crypt, id: *Identity, d: []const u8, e: Encoding) Error![]const u8 {
     var buffer: []u8 = undefined;
 
     switch (e) {
@@ -78,7 +78,7 @@ pub fn decrypt(c: Crypt, id: Identity, d: []const u8, e: Encoding) Error![]const
 }
 
 /// Return a hash using Blake3 and the Identity's symmetric token
-pub fn hash(c: Crypt, id: Identity, data: []const u8) Error![]const u8 {
+pub fn hash(c: Crypt, id: *Identity, data: []const u8) Error![]const u8 {
     var buffer: [Blake3.digest_length * 2]u8 = undefined;
     Blake3.hash(data, &buffer, .{ .key = try id.token() });
     buffer = std.fmt.bytesToHex(buffer[0..Blake3.digest_length], .lower);

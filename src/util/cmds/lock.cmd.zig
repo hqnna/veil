@@ -52,7 +52,7 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
 
 // Attempt to encrypt a file at the given path
 fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
-    const id = try Identity.load(try c.keys.read(.secret));
+    var id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
 
@@ -61,13 +61,13 @@ fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     const name = try c.allocator.dupe(u8, file.meta.name);
     errdefer c.allocator.free(name);
 
-    const hash = try c.crypt.hash(id, file.data);
+    const hash = try c.crypt.hash(&id, file.data);
     errdefer c.allocator.free(hash);
 
     const cdata = try std.mem.concat(c.allocator, u8, &.{ name, &.{1}, file.data });
     defer c.allocator.free(cdata);
 
-    const data = try c.crypt.encrypt(id, cdata, .b64);
+    const data = try c.crypt.encrypt(&id, cdata, .b64);
     defer c.allocator.free(data);
 
     const sig = try id.sign(c.allocator, file.data);
@@ -90,7 +90,7 @@ fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
 
 // Attempt to encrypt a directory at the given path
 fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
-    const id = try Identity.load(try c.keys.read(.secret));
+    var id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
 
@@ -112,7 +112,7 @@ fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     errdefer c.allocator.free(old_name);
 
     const parent = std.fs.path.dirname(rpath);
-    const new_name = try c.crypt.encrypt(id, old_name, .hex);
+    const new_name = try c.crypt.encrypt(&id, old_name, .hex);
     errdefer c.allocator.free(new_name);
 
     const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });

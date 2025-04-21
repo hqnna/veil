@@ -11,7 +11,7 @@ pub fn call(c: *Command) Command.Error!u8 {
         return 1;
     }
 
-    const identity = Identity.create();
+    var identity = Identity.create();
     const secret_key = try identity.encode(c.allocator, .secret);
     const public_key = try identity.encode(c.allocator, .public);
     try c.keys.write(.secret, secret_key);

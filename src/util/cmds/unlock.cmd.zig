@@ -54,14 +54,14 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
 
 // Attempt to decrypt a file at the given path
 fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
-    const id = try Identity.load(try c.keys.read(.secret));
+    var id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
 
     if (!std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
 
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
-    const data = try c.crypt.decrypt(id, file.data[5 .. file.data.len - size], .b64);
+    const data = try c.crypt.decrypt(&id, file.data[5 .. file.data.len - size], .b64);
     defer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
@@ -87,7 +87,7 @@ fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
 
 // Attempt to decrypt a directory at the given path
 fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
-    const id = try Identity.load(try c.keys.read(.secret));
+    var id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
 
@@ -109,7 +109,7 @@ fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     errdefer c.allocator.free(old_name);
 
     const parent = std.fs.path.dirname(rpath);
-    const new_name = try c.crypt.decrypt(id, old_name, .hex);
+    const new_name = try c.crypt.decrypt(&id, old_name, .hex);
     errdefer c.allocator.free(new_name);
 
     const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
