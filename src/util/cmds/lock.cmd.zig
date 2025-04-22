@@ -17,29 +17,46 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
     const info = try std.fs.cwd().statFile(path);
 
     switch (info.kind) {
-        .file => if (try encryptFile(c, path)) |meta| {
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "encrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+        .file => if (try encryptFile(c, path)) |rename| switch (rename) {
+            .changed => |meta| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "encrypted ");
+                try write(c.stdout.writer(), .Green, meta.old);
+                try write(c.stdout.writer(), .Default, " as ");
+                try write(c.stdout.writer(), .Green, meta.new);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
+            .kept => |file_name| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "encrypted ");
+                try write(c.stdout.writer(), .Green, file_name);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
         } else {
             try write(c.stderr.writer(), .Red, "error:");
             try write(c.stderr.writer(), .Default, " ");
             try c.stderr.writeAll("the file is already encrypted\n");
             return 1;
         },
-        .directory => {
-            const meta = try encryptDir(c, path);
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "encrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+        .directory => switch (try encryptDir(c, path)) {
+            .changed => |meta| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "encrypted ");
+                try write(c.stdout.writer(), .Green, meta.old);
+                try write(c.stdout.writer(), .Default, " as ");
+                try write(c.stdout.writer(), .Green, meta.new);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
+            .kept => |dir_name| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "encrypted ");
+                try write(c.stdout.writer(), .Green, dir_name);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
         },
         else => {
             try write(c.stderr.writer(), .Red, "error:");
@@ -82,10 +99,7 @@ fn encryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     try dir.writeFile(.{ .sub_path = hash, .data = sdata });
     try dir.deleteFile(file.meta.path);
 
-    return sys.Rename{
-        .old = name,
-        .new = hash,
-    };
+    return sys.Rename{ .changed = .{ .old = name, .new = hash } };
 }
 
 // Attempt to encrypt a directory at the given path
@@ -124,10 +138,7 @@ fn encryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
 
     try std.fs.renameAbsolute(rpath, npath);
 
-    return sys.Rename{
-        .old = old_name,
-        .new = new_name,
-    };
+    return sys.Rename{ .changed = .{ .old = old_name, .new = new_name } };
 }
 
 fn worker(
@@ -151,16 +162,25 @@ fn worker(
         .directory => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            const meta = try encryptDir(c, sub_path);
-            c.allocator.free(meta.old);
-            c.allocator.free(meta.new);
+            switch (try encryptDir(c, sub_path)) {
+                .kept => |name| c.allocator.free(name),
+                .changed => |meta| {
+                    c.allocator.free(meta.old);
+                    c.allocator.free(meta.new);
+                },
+            }
         },
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            const meta = try encryptFile(c, sub_path);
-            if (meta) |m| c.allocator.free(m.old);
-            if (meta) |m| c.allocator.free(m.new);
+            const rename = try encryptFile(c, sub_path);
+            if (rename) |r| switch (r) {
+                .kept => |name| c.allocator.free(name),
+                .changed => |meta| {
+                    c.allocator.free(meta.old);
+                    c.allocator.free(meta.new);
+                },
+            };
         },
         else => continue,
     };

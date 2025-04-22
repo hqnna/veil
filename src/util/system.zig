@@ -1,10 +1,13 @@
 const std = @import("std");
 
-// Encryption metadata such as the original name and the resulting hash
-pub const Rename = struct { old: []const u8, new: []const u8 };
-
 /// Magic bytes put at the beginning of encrypted files
 pub const magic = [5]u8{ 'v', 'e', 'i', 'l', 1 };
+
+// Encryption metadata such as the original name and the resulting hash
+pub const Rename = union(enum(u1)) {
+    changed: struct { old: []const u8, new: []const u8 },
+    kept: []const u8,
+};
 
 /// Possible filesystem related errors for utils
 pub const Error = std.mem.Allocator.Error ||

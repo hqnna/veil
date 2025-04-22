@@ -19,14 +19,23 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
     const info = try std.fs.cwd().statFile(path);
 
     switch (info.kind) {
-        .file => if (try decryptFile(c, path)) |meta| {
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "decrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+        .file => if (try decryptFile(c, path)) |rename| switch (rename) {
+            .changed => |meta| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "decrypted ");
+                try write(c.stdout.writer(), .Green, meta.old);
+                try write(c.stdout.writer(), .Default, " as ");
+                try write(c.stdout.writer(), .Green, meta.new);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
+            .kept => |file_name| {
+                try write(c.stdout.writer(), .Green, "successfully ");
+                try write(c.stdout.writer(), .Default, "decrypted ");
+                try write(c.stdout.writer(), .Green, file_name);
+                try write(c.stdout.writer(), .Default, "\n");
+                return 0;
+            },
         } else {
             try write(c.stderr.writer(), .Red, "error:");
             try write(c.stderr.writer(), .Default, " ");
@@ -34,14 +43,24 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
             return 1;
         },
         .directory => {
-            const meta = try decryptDir(c, path);
-            try write(c.stdout.writer(), .Green, "successfully ");
-            try write(c.stdout.writer(), .Default, "decrypted ");
-            try write(c.stdout.writer(), .Green, meta.old);
-            try write(c.stdout.writer(), .Default, " as ");
-            try write(c.stdout.writer(), .Green, meta.new);
-            try write(c.stdout.writer(), .Default, "\n");
-            return 0;
+            switch (try decryptDir(c, path)) {
+                .changed => |meta| {
+                    try write(c.stdout.writer(), .Green, "successfully ");
+                    try write(c.stdout.writer(), .Default, "decrypted ");
+                    try write(c.stdout.writer(), .Green, meta.old);
+                    try write(c.stdout.writer(), .Default, " as ");
+                    try write(c.stdout.writer(), .Green, meta.new);
+                    try write(c.stdout.writer(), .Default, "\n");
+                    return 0;
+                },
+                .kept => |dir_name| {
+                    try write(c.stdout.writer(), .Green, "successfully ");
+                    try write(c.stdout.writer(), .Default, "decrypted ");
+                    try write(c.stdout.writer(), .Green, dir_name);
+                    try write(c.stdout.writer(), .Default, "\n");
+                    return 0;
+                },
+            }
         },
         else => {
             try write(c.stderr.writer(), .Red, "error:");
@@ -79,10 +98,7 @@ fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
     try dir.writeFile(.{ .sub_path = new_name, .data = file_data });
     try dir.deleteFile(file.meta.path);
 
-    return sys.Rename{
-        .old = old_name,
-        .new = new_name,
-    };
+    return sys.Rename{ .changed = .{ .old = old_name, .new = new_name } };
 }
 
 // Attempt to decrypt a directory at the given path
@@ -121,10 +137,7 @@ fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
 
     try std.fs.renameAbsolute(rpath, npath);
 
-    return sys.Rename{
-        .old = old_name,
-        .new = new_name,
-    };
+    return sys.Rename{ .changed = .{ .old = old_name, .new = new_name } };
 }
 
 fn worker(
@@ -148,16 +161,24 @@ fn worker(
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            const meta = try decryptFile(c, sub_path);
-            if (meta) |m| c.allocator.free(m.old);
-            if (meta) |m| c.allocator.free(m.new);
+            if (try decryptFile(c, sub_path)) |r| switch (r) {
+                .kept => |name| c.allocator.free(name),
+                .changed => |meta| {
+                    c.allocator.free(meta.old);
+                    c.allocator.free(meta.new);
+                },
+            };
         },
         .directory => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            const meta = try decryptDir(c, sub_path);
-            c.allocator.free(meta.old);
-            c.allocator.free(meta.new);
+            switch (try decryptDir(c, sub_path)) {
+                .kept => |name| c.allocator.free(name),
+                .changed => |meta| {
+                    c.allocator.free(meta.old);
+                    c.allocator.free(meta.new);
+                },
+            }
         },
         else => continue,
     };
