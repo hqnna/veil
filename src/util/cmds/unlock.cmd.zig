@@ -5,10 +5,11 @@ const write = @import("../color.zig").write;
 const Identity = @import("../../crypto/identity.zig");
 const Ed25519 = std.crypto.sign.Ed25519;
 const Box = @import("../sync.zig").Box;
+const Naming = @import("root").Naming;
 const Base64 = std.base64.standard;
 
 /// Attempt to decrypt a folder or file at a specified path
-pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
+pub fn call(c: *Command, n: Naming, path: []const u8) Command.Error!u8 {
     std.fs.cwd().access(path, .{}) catch {
         try write(c.stderr.writer(), .Red, "error:");
         try write(c.stderr.writer(), .Default, " ");
@@ -19,7 +20,7 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
     const info = try std.fs.cwd().statFile(path);
 
     switch (info.kind) {
-        .file => if (try decryptFile(c, path)) |rename| switch (rename) {
+        .file => if (try decryptFile(c, n, path)) |rename| switch (rename) {
             .changed => |meta| {
                 try write(c.stdout.writer(), .Green, "successfully ");
                 try write(c.stdout.writer(), .Default, "decrypted ");
@@ -43,7 +44,7 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
             return 1;
         },
         .directory => {
-            switch (try decryptDir(c, path)) {
+            switch (try decryptDir(c, n, path)) {
                 .changed => |meta| {
                     try write(c.stdout.writer(), .Green, "successfully ");
                     try write(c.stdout.writer(), .Default, "decrypted ");
@@ -72,7 +73,7 @@ pub fn call(c: *Command, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to decrypt a file at the given path
-fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
+fn decryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rename {
     var id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
@@ -87,22 +88,32 @@ fn decryptFile(c: *Command, path: []const u8) Command.Error!?sys.Rename {
 
     const old_name = try c.allocator.dupe(u8, file.meta.name);
     errdefer c.allocator.free(old_name);
-    const new_name = try c.allocator.dupe(u8, iterator.next().?);
-    errdefer c.allocator.free(new_name);
+    const file_name = iterator.next().?;
     const file_data = iterator.rest();
 
     try id.verify(file_data, file.data[file.data.len - size ..]);
     var dir = try std.fs.openDirAbsolute(file.meta.dir, .{});
     defer dir.close();
 
-    try dir.writeFile(.{ .sub_path = new_name, .data = file_data });
-    try dir.deleteFile(file.meta.path);
+    if (n == .change) {
+        const new_name = try c.allocator.dupe(u8, file_name);
+        errdefer c.allocator.free(new_name);
 
-    return sys.Rename{ .changed = .{ .old = old_name, .new = new_name } };
+        try dir.writeFile(.{ .sub_path = new_name, .data = file_data });
+        try dir.deleteFile(file.meta.path);
+
+        return .{ .changed = .{
+            .old = old_name,
+            .new = new_name,
+        } };
+    }
+
+    try dir.writeFile(.{ .sub_path = old_name, .data = file_data });
+    return .{ .kept = old_name };
 }
 
 // Attempt to decrypt a directory at the given path
-fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
+fn decryptDir(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename {
     var id = try Identity.load(try c.keys.read(.secret));
     var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer dir.close();
@@ -111,11 +122,11 @@ fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     var iterator = Box(std.fs.Dir.Iterator).init(dir.iterate());
 
     if (c.threads.allowed == 1) {
-        try worker(c, &dir, &group, &iterator);
+        try worker(c, &dir, &group, &iterator, n);
     } else {
         c.mutex.lock();
         while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
-            _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator });
+            _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator, n });
         }
         c.mutex.unlock();
     }
@@ -128,16 +139,23 @@ fn decryptDir(c: *Command, path: []const u8) Command.Error!sys.Rename {
     const old_name = try c.allocator.dupe(u8, name_buf);
     errdefer c.allocator.free(old_name);
 
-    const parent = std.fs.path.dirname(rpath);
-    const new_name = try c.crypt.decrypt(&id, old_name, .hex);
-    errdefer c.allocator.free(new_name);
+    if (n == .change) {
+        const parent = std.fs.path.dirname(rpath);
+        const new_name = try c.crypt.decrypt(&id, old_name, .hex);
+        errdefer c.allocator.free(new_name);
 
-    const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
-    defer c.allocator.free(npath);
+        const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
+        defer c.allocator.free(npath);
 
-    try std.fs.renameAbsolute(rpath, npath);
+        try std.fs.renameAbsolute(rpath, npath);
 
-    return sys.Rename{ .changed = .{ .old = old_name, .new = new_name } };
+        return .{ .changed = .{
+            .old = old_name,
+            .new = new_name,
+        } };
+    }
+
+    return .{ .kept = old_name };
 }
 
 fn worker(
@@ -145,6 +163,7 @@ fn worker(
     d: *std.fs.Dir,
     wg: *std.Thread.WaitGroup,
     it: *Box(std.fs.Dir.Iterator),
+    n: Naming,
 ) Command.Error!void {
     wg.start();
 
@@ -161,7 +180,7 @@ fn worker(
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            if (try decryptFile(c, sub_path)) |r| switch (r) {
+            if (try decryptFile(c, n, sub_path)) |r| switch (r) {
                 .kept => |name| c.allocator.free(name),
                 .changed => |meta| {
                     c.allocator.free(meta.old);
@@ -172,7 +191,7 @@ fn worker(
         .directory => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            switch (try decryptDir(c, sub_path)) {
+            switch (try decryptDir(c, n, sub_path)) {
                 .kept => |name| c.allocator.free(name),
                 .changed => |meta| {
                     c.allocator.free(meta.old);

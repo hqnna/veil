@@ -5,7 +5,7 @@ const Keys = @import("../util/keys.zig");
 const write = @import("../util/color.zig").write;
 const Identity = @import("../crypto/identity.zig");
 const Crypt = @import("../crypto/crypt.zig");
-const Schema = @import("../main.zig").Schema;
+const Schema = @import("root").Schema;
 
 // BEGIN COMMANDS --------------------------------------------------------------
 const initCmd = @import("cmds/init.cmd.zig");
@@ -67,9 +67,9 @@ pub fn eval(c: *Commands, args: [][:0]const u8) Error!noreturn {
     if (std.mem.eql(u8, args[0], "init")) {
         std.process.exit(try initCmd.call(c));
     } else if (std.mem.eql(u8, args[0], "lock")) {
-        std.process.exit(try lockCmd.call(c, args[1]));
+        std.process.exit(try lockCmd.call(c, c.options.naming, args[1]));
     } else if (std.mem.eql(u8, args[0], "unlock")) {
-        std.process.exit(try unlockCmd.call(c, args[1]));
+        std.process.exit(try unlockCmd.call(c, c.options.naming, args[1]));
     } else {
         try write(c.stderr.writer(), .Red, "error:");
         try write(c.stderr.writer(), .Default, " ");

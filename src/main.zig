@@ -4,8 +4,13 @@ const help = @import("help/help.zig");
 const color = @import("util/color.zig");
 const Commands = @import("util/cmds.zig");
 
+/// Whether to change the names of encrypted files
+pub const Naming = enum(u1) { change, keep };
+
+/// The options / flags that the cli supports
 pub const Schema = struct {
-    pub const shorthands = .{ .h = "help", .t = "threads" };
+    pub const shorthands = .{ .h = "help", .t = "threads", .n = "naming" };
+    naming: Naming = .change,
     threads: ?usize = null,
     version: bool = false,
     color: bool = true,

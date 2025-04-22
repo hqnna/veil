@@ -9,6 +9,7 @@ unlock <path>         Decrypt a file or directory.
 
 --color=[bool]        Enable or disable colors.
 -t, --threads=[int]   Set the number of threads.
+-n, --naming=[enum]   Change encrypted naming method.
 -h, --help            Show this help message text.
 --version             Show the current version.
 
