@@ -5,6 +5,7 @@ const Keys = @import("../util/keys.zig");
 const write = @import("../util/color.zig").write;
 const Identity = @import("../crypto/identity.zig");
 const Crypt = @import("../crypto/crypt.zig");
+const Schema = @import("../main.zig").Schema;
 
 // BEGIN COMMANDS --------------------------------------------------------------
 const initCmd = @import("cmds/init.cmd.zig");
@@ -14,6 +15,7 @@ const unlockCmd = @import("cmds/unlock.cmd.zig");
 
 keys: Keys,
 crypt: Crypt,
+options: Schema,
 stdout: std.fs.File,
 stderr: std.fs.File,
 allocator: std.mem.Allocator,
@@ -37,7 +39,7 @@ pub fn init(
     allocator: std.mem.Allocator,
     stdout: std.fs.File,
     stderr: std.fs.File,
-    threads: ?usize,
+    options: Schema,
 ) Error!Commands {
     var keys = try Keys.init(allocator);
     errdefer keys.deinit();
@@ -46,11 +48,15 @@ pub fn init(
         .crypt = Crypt.init(allocator),
         .mutex = std.Thread.Mutex{},
         .allocator = allocator,
+        .options = options,
         .stdout = stdout,
         .stderr = stderr,
         .keys = keys,
         .threads = .{
-            .allowed = threads orelse try std.Thread.getCpuCount(),
+            .allowed = value: {
+                if (options.threads) |v| if (v >= 1) break :value v;
+                break :value try std.Thread.getCpuCount();
+            },
             .used = 0,
         },
     };
