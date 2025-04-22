@@ -85,7 +85,6 @@ fn decryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rena
     defer c.allocator.free(data);
 
     var iterator = std.mem.splitScalar(u8, data, 1);
-
     const old_name = try c.allocator.dupe(u8, file.meta.name);
     errdefer c.allocator.free(old_name);
     const file_name = iterator.next().?;
@@ -95,7 +94,7 @@ fn decryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rena
     var dir = try std.fs.openDirAbsolute(file.meta.dir, .{});
     defer dir.close();
 
-    if (n == .change) {
+    if (!std.mem.eql(u8, old_name, file_name) and n == .change) {
         const new_name = try c.allocator.dupe(u8, file_name);
         errdefer c.allocator.free(new_name);
 
@@ -140,10 +139,12 @@ fn decryptDir(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename
     errdefer c.allocator.free(old_name);
 
     if (n == .change) {
-        const parent = std.fs.path.dirname(rpath);
-        const new_name = try c.crypt.decrypt(&id, old_name, .hex);
-        errdefer c.allocator.free(new_name);
+        const new_name = c.crypt.decrypt(&id, old_name, .hex) catch {
+            return .{ .kept = old_name };
+        };
 
+        errdefer c.allocator.free(new_name);
+        const parent = std.fs.path.dirname(rpath);
         const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
         defer c.allocator.free(npath);
 
