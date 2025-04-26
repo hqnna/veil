@@ -15,3 +15,11 @@ artifacts:
 tasks:
   # Build veil using the debug nix package
   - build: cd ~/veil && nix build $PWD#debug
+  # Run an encryption and decryption test on the src
+  - test: |
+      cd ~/veil
+      cp -r src test
+      ./result/bin/veil init
+      ./result/bin/veil lock -n keep test
+      ./result/bin/veil unlock test
+      diff src/main.zig test/main.zig
