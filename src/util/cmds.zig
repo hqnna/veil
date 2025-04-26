@@ -5,6 +5,7 @@ const Keys = @import("../util/keys.zig");
 const write = @import("../util/color.zig").write;
 const Identity = @import("../crypto/identity.zig");
 const Crypt = @import("../crypto/crypt.zig");
+const Queue = @import("sync.zig").Queue;
 const Schema = @import("root").Schema;
 
 // BEGIN COMMANDS --------------------------------------------------------------
@@ -19,11 +20,7 @@ options: Schema,
 stdout: std.fs.File,
 stderr: std.fs.File,
 allocator: std.mem.Allocator,
-mutex: std.Thread.Mutex,
-threads: struct {
-    allowed: usize,
-    used: usize,
-},
+queue: Queue,
 
 /// Combination of error unions used for commands
 pub const Error = error{RenameAcrossMountPoints} ||
@@ -45,20 +42,16 @@ pub fn init(
     errdefer keys.deinit();
 
     return Commands{
-        .crypt = Crypt.init(allocator),
-        .mutex = std.Thread.Mutex{},
-        .allocator = allocator,
-        .options = options,
-        .stdout = stdout,
-        .stderr = stderr,
         .keys = keys,
-        .threads = .{
-            .allowed = value: {
-                if (options.threads) |v| if (v >= 1) break :value v;
-                break :value try std.Thread.getCpuCount();
-            },
-            .used = 0,
-        },
+        .stderr = stderr,
+        .stdout = stdout,
+        .options = options,
+        .allocator = allocator,
+        .crypt = Crypt.init(allocator),
+        .queue = Queue.init(value: {
+            if (options.threads) |v| if (v >= 1) break :value v;
+            break :value try std.Thread.getCpuCount();
+        }),
     };
 }
 

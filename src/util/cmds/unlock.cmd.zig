@@ -119,18 +119,9 @@ fn decryptDir(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename
 
     var group = std.Thread.WaitGroup{};
     var iterator = Box(std.fs.Dir.Iterator).init(dir.iterate());
-
-    if (c.threads.allowed == 1) {
-        try worker(c, &dir, &group, &iterator, n);
-    } else {
-        c.mutex.lock();
-        while (c.threads.used < c.threads.allowed) : (c.threads.used += 1) {
-            _ = try std.Thread.spawn(.{}, worker, .{ c, &dir, &group, &iterator, n });
-        }
-        c.mutex.unlock();
-    }
-
+    try c.queue.spawn(&group, worker, .{ c, &dir, &iterator, n });
     group.wait();
+
     const rpath = try dir.realpathAlloc(c.allocator, ".");
     defer c.allocator.free(rpath);
 
@@ -162,21 +153,9 @@ fn decryptDir(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename
 fn worker(
     c: *Command,
     d: *std.fs.Dir,
-    wg: *std.Thread.WaitGroup,
     it: *Box(std.fs.Dir.Iterator),
     n: Naming,
 ) Command.Error!void {
-    wg.start();
-
-    defer {
-        wg.finish();
-        if (c.threads.allowed > 1) {
-            c.mutex.lock();
-            c.threads.used -= 1;
-            c.mutex.unlock();
-        }
-    }
-
     while (try it.get().next()) |entry| switch (entry.kind) {
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
