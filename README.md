@@ -7,6 +7,17 @@ An encrypted file storage utility and personal vault for the command line.
 
 ## Usage
 
+To view information about options and commands, run the following:
+
+```console
+$ veil --help
+```
+
+This will print a help message to the terminal with information about options
+and various commands.
+
+### Basic Usage
+
 To get started you will want to first initialize a keypair to encrypt with:
 
 ```console
@@ -33,14 +44,17 @@ successfully decrypted d22c79d53c55d9c11c46b8cb956e40faef538ae4b7df355c0d5ad1e6e
 This will decrypt the file and restore the original file name, it verifies the
 decrypted contents before saving.
 
-## Security information
+## Security Information
 
-Veil takes advantages of multiple technologies, primarily the following:
+Veil takes advantage of multiple technologies, primarily the following:
 1. **Ed25519** for user identities and keypairs, as well as signing encrypted data.
 2. **X25519** keys are derived from the user's identity and are used to create keys.
 3. **Aegis256x4** is used for actual encryption of file data and directory names.
 4. **Blake3** is used to hash file names, with original names being encrypted.
 5. **Base64** and **Hex** to encode data that has been encrypted for storage.
+
+Note that this has been extremely simplified, there is a lot more involved than
+just this.
 
 ### How to report security issues
 
@@ -51,7 +65,7 @@ offer bounties for people who find vulnerabilities that entirely compromise the
 integrity of the software, but for most vulnerabilities there will not be one
 due to this being a hobby project.
 
-## Building from source
+## Building From Source
 
 The recommended way to build from source is to use the [flake](flake.nix) and
 run the following:
