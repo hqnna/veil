@@ -21,17 +21,26 @@ pub fn main() !void {
     const stdout = std.io.getStdOut();
     const stderr = std.io.getStdErr();
     const allocator = std.heap.smp_allocator;
+    var env = try std.process.getEnvMap(allocator);
+    defer env.deinit();
 
     var cli = try args.parseForCurrentProcess(Schema, allocator, .silent);
     defer cli.deinit();
 
-    try color.checkCapability(allocator, stdout, cli.options.color);
+    try color.checkCapability(env, stdout, cli.options.color);
 
     if (cli.options.help) try help.print(stdout, .full);
     if (cli.options.version) try help.print(stdout, .version);
     if (cli.positionals.len == 0) try help.print(stdout, .usage);
-    var handler = try Commands.init(allocator, stdout, stderr, cli.options);
-    defer handler.deinit();
 
-    try handler.eval(cli.positionals);
+    var handler = try Commands.init(allocator, .{
+        .params = cli.positionals,
+        .flags = cli.options,
+        .stdout = stdout,
+        .stderr = stderr,
+        .env = env,
+    });
+
+    defer handler.deinit();
+    try handler.run();
 }

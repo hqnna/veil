@@ -17,10 +17,7 @@ pub const Error = xdg.Error ||
     error{InvalidDirectory};
 
 /// Initialize a new storage utility instance
-pub fn init(allocator: std.mem.Allocator) Error!Keys {
-    var env = try std.process.getEnvMap(allocator);
-    defer env.deinit();
-
+pub fn init(allocator: std.mem.Allocator, env: std.process.EnvMap) Error!Keys {
     var data_dir: []u8 = undefined;
 
     if (env.get("VEIL_HOME")) |custom_dir| {
