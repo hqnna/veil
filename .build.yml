@@ -19,6 +19,7 @@ tasks:
   - test: |
       cd ~/veil
       cp -r src test
+      mkdir -p ~/.local/share
       ./result/bin/veil init
       ./result/bin/veil lock -n keep test
       ./result/bin/veil unlock test
