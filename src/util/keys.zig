@@ -8,8 +8,9 @@ allocator: std.mem.Allocator,
 
 /// List of possible storage errors that could happen
 pub const Error = xdg.Error ||
-    std.posix.MakeDirError ||
+    std.fs.Dir.RealPathAllocError ||
     std.mem.Allocator.Error ||
+    std.posix.MakeDirError ||
     std.fs.File.WriteError ||
     std.fs.File.ReadError ||
     std.fs.File.OpenError ||
@@ -17,20 +18,34 @@ pub const Error = xdg.Error ||
 
 /// Initialize a new storage utility instance
 pub fn init(allocator: std.mem.Allocator) Error!Keys {
-    const data_dir = try xdg.getPath(allocator, .data);
-    if (data_dir == null) return Error.InvalidDirectory;
-    defer allocator.free(data_dir.?);
+    var env = try std.process.getEnvMap(allocator);
+    defer env.deinit();
 
-    const dir = try std.fs.path.join(allocator, &.{ data_dir.?, "veil" });
-    errdefer allocator.free(dir);
+    var data_dir: []u8 = undefined;
 
-    std.fs.accessAbsolute(dir, .{}) catch {
-        try std.fs.makeDirAbsolute(dir);
-    };
+    if (env.get("VEIL_HOME")) |custom_dir| {
+        data_dir = try std.fs.cwd().realpathAlloc(allocator, custom_dir);
+        errdefer allocator.free(data_dir);
+
+        std.fs.accessAbsolute(data_dir, .{}) catch {
+            try std.fs.makeDirAbsolute(data_dir);
+        };
+    } else {
+        const xdg_dir = try xdg.getPath(allocator, .data);
+        if (xdg_dir == null) return Error.InvalidDirectory;
+        defer allocator.free(xdg_dir.?);
+
+        data_dir = try std.fs.path.join(allocator, &.{ xdg_dir.?, "veil" });
+        errdefer allocator.free(data_dir);
+
+        std.fs.accessAbsolute(data_dir, .{}) catch {
+            try std.fs.makeDirAbsolute(data_dir);
+        };
+    }
 
     return Keys{
         .allocator = allocator,
-        .dir = dir,
+        .dir = data_dir,
     };
 }
 

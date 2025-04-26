@@ -13,8 +13,12 @@ unlock <path>         Decrypt a file or directory.
 -h, --help            Show this help message text.
 --version             Show the current version.
 
-Color can also be enabled or disabled with the use
-of the NO_COLOR, VEIL_COLOR, and TERM environment
-variables. Setting NO_COLOR to any value or setting
-TERM to the value "dumb" will also disable color.
-You can set VEIL_COLOR to toggle color as well.
+By default keys are stored in the $XDG_DATA_HOME/veil
+folder, however the VEIL_HOME variable can be set to
+the path of a directory and that will be used instead.
+
+Color can be enabled or disabled with the use of the 
+NO_COLOR, VEIL_COLOR, and TERM environment variables. 
+Setting NO_COLOR to any value or setting TERM to the 
+value "dumb" will also disable color. You can set 
+VEIL_COLOR to toggle color on or off as well.
