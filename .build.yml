@@ -17,10 +17,9 @@ tasks:
   - build: cd ~/veil && nix build $PWD#debug
   # Run an encryption and decryption test on the src
   - test: |
-      cd ~/veil
-      cp -r src test
-      mkdir -p ~/.local/share
-      ./result/bin/veil init
+      cd ~/veil && cp -r src test
+      export VEIL_HOME=$(mktemp -d)
+      ./result/bin/veil init --threads=1
       ./result/bin/veil lock -n keep test
       ./result/bin/veil unlock test
       diff src/main.zig test/main.zig
