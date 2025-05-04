@@ -7,6 +7,17 @@ pub const magic = [5]u8{ 'v', 'e', 'i', 'l', 1 };
 pub const Rename = union(enum(u1)) {
     changed: struct { old: []const u8, new: []const u8 },
     kept: []const u8,
+
+    /// Free allocated resources relating to rename changes
+    pub fn deinit(r: Rename, allocator: std.mem.Allocator) void {
+        switch (r) {
+            .kept => |name| allocator.free(name),
+            .changed => |data| {
+                allocator.free(data.old);
+                allocator.free(data.new);
+            },
+        }
+    }
 };
 
 /// Possible filesystem related errors for utils

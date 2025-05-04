@@ -158,24 +158,14 @@ fn worker(
         .directory => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            switch (try encryptDir(c, n, sub_path)) {
-                .kept => |name| c.allocator.free(name),
-                .changed => |meta| {
-                    c.allocator.free(meta.old);
-                    c.allocator.free(meta.new);
-                },
-            }
+            const result = try encryptDir(c, n, sub_path);
+            defer result.deinit(c.allocator);
         },
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
-            if (try encryptFile(c, n, sub_path)) |r| switch (r) {
-                .kept => |name| c.allocator.free(name),
-                .changed => |meta| {
-                    c.allocator.free(meta.old);
-                    c.allocator.free(meta.new);
-                },
-            };
+            const result = try encryptFile(c, n, sub_path);
+            defer if (result) |r| r.deinit(c.allocator);
         },
         else => continue,
     };
