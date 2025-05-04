@@ -20,7 +20,7 @@ pub fn call(c: *Command, n: Naming, path: []const u8) Command.Error!u8 {
     const info = try std.fs.cwd().statFile(path);
 
     switch (info.kind) {
-        .file => if (try decryptFile(c, n, path)) |rename| switch (rename) {
+        .file => switch (try decryptFile(c, n, path)) {
             .changed => |meta| {
                 try write(c.stdout.writer(), .Green, "successfully ");
                 try write(c.stdout.writer(), .Default, "decrypted ");
@@ -37,11 +37,12 @@ pub fn call(c: *Command, n: Naming, path: []const u8) Command.Error!u8 {
                 try write(c.stdout.writer(), .Default, "\n");
                 return 0;
             },
-        } else {
-            try write(c.stderr.writer(), .Red, "error:");
-            try write(c.stderr.writer(), .Default, " ");
-            try c.stderr.writeAll("the file has not been encrypted\n");
-            return 1;
+            .none => {
+                try write(c.stderr.writer(), .Red, "error:");
+                try write(c.stderr.writer(), .Default, " ");
+                try c.stderr.writeAll("the file has not been encrypted\n");
+                return 1;
+            },
         },
         .directory => {
             switch (try decryptDir(c, n, path)) {
@@ -61,6 +62,7 @@ pub fn call(c: *Command, n: Naming, path: []const u8) Command.Error!u8 {
                     try write(c.stdout.writer(), .Default, "\n");
                     return 0;
                 },
+                .none => unreachable,
             }
         },
         else => {
@@ -73,12 +75,12 @@ pub fn call(c: *Command, n: Naming, path: []const u8) Command.Error!u8 {
 }
 
 // Attempt to decrypt a file at the given path
-fn decryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rename {
+fn decryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename {
     var id = try Identity.load(try c.keys.read(.secret));
     const file = try sys.File.load(c.allocator, path);
     defer file.unload(c.allocator);
 
-    if (!std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
+    if (!std.mem.eql(u8, file.data[0..5], &sys.magic)) return .none;
 
     const size = Base64.Encoder.calcSize(Ed25519.Signature.encoded_length);
     const data = try c.crypt.decrypt(&id, file.data[5 .. file.data.len - size], .b64);
@@ -154,13 +156,13 @@ fn worker(
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
             const result = try decryptDir(c, n, sub_path);
-            defer result.deinit(c.allocator);
+            defer if (result != .none) result.deinit(c.allocator);
         },
         .file => {
             const sub_path = try d.realpathAlloc(c.allocator, entry.name);
             defer c.allocator.free(sub_path);
             const result = try decryptFile(c, n, sub_path);
-            defer if (result) |r| r.deinit(c.allocator);
+            defer if (result != .none) result.deinit(c.allocator);
         },
         else => continue,
     };

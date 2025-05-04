@@ -49,13 +49,15 @@ pub const File = struct {
 };
 
 // Encryption metadata such as the original name and the resulting hash
-pub const Rename = union(enum(u1)) {
+pub const Rename = union(enum(u2)) {
     changed: struct { old: []const u8, new: []const u8 },
     kept: []const u8,
+    none: void,
 
     /// Initialize a new instance of the rename information struct
     pub fn init(allocator: std.mem.Allocator, data: Rename) Error!Rename {
         return switch (data) {
+            .none => unreachable,
             .kept => |name| .{ .kept = try allocator.dupe(u8, name) },
             .changed => |meta| .{ .changed = .{
                 .old = try allocator.dupe(u8, meta.old),
@@ -67,6 +69,7 @@ pub const Rename = union(enum(u1)) {
     /// Free allocated resources relating to rename changes
     pub fn deinit(r: Rename, allocator: std.mem.Allocator) void {
         switch (r) {
+            .none => return,
             .kept => |name| allocator.free(name),
             .changed => |data| {
                 allocator.free(data.old);
