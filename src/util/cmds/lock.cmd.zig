@@ -76,10 +76,8 @@ fn encryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rena
 
     if (std.mem.eql(u8, file.data[0..5], &sys.magic)) return null;
 
-    const old_name = try c.allocator.dupe(u8, file.meta.name);
-    errdefer c.allocator.free(old_name);
-
-    const cdata = try std.mem.concat(c.allocator, u8, &.{ old_name, &.{1}, file.data });
+    const rdata: []const []const u8 = &.{ file.meta.name, &.{1}, file.data };
+    const cdata = try std.mem.concat(c.allocator, u8, rdata);
     defer c.allocator.free(cdata);
 
     const data = try c.crypt.encrypt(&id, cdata, .b64);
@@ -96,19 +94,19 @@ fn encryptFile(c: *Command, n: Naming, path: []const u8) Command.Error!?sys.Rena
 
     if (n == .change) {
         const new_name = try c.crypt.hash(&id, file.data);
-        errdefer c.allocator.free(new_name);
+        defer c.allocator.free(new_name);
 
         try dir.writeFile(.{ .sub_path = new_name, .data = sdata });
         try dir.deleteFile(file.meta.path);
 
-        return .{ .changed = .{
-            .old = old_name,
+        return try sys.Rename.init(c.allocator, .{ .changed = .{
+            .old = file.meta.name,
             .new = new_name,
-        } };
+        } });
     }
 
-    try dir.writeFile(.{ .sub_path = old_name, .data = sdata });
-    return .{ .kept = old_name };
+    try dir.writeFile(.{ .sub_path = file.meta.name, .data = sdata });
+    return try sys.Rename.init(c.allocator, .{ .kept = file.meta.name });
 }
 
 // Attempt to encrypt a directory at the given path
@@ -125,27 +123,24 @@ fn encryptDir(c: *Command, n: Naming, path: []const u8) Command.Error!sys.Rename
     const rpath = try dir.realpathAlloc(c.allocator, ".");
     defer c.allocator.free(rpath);
 
-    const name_buf = std.fs.path.basename(rpath);
-    const old_name = try c.allocator.dupe(u8, name_buf);
-    errdefer c.allocator.free(old_name);
+    const old_name = std.fs.path.basename(rpath);
 
     if (n == .change) {
         const parent = std.fs.path.dirname(rpath);
         const new_name = try c.crypt.encrypt(&id, old_name, .hex);
-        errdefer c.allocator.free(new_name);
+        defer c.allocator.free(new_name);
 
         const npath = try std.fs.path.join(c.allocator, &.{ parent.?, new_name });
         defer c.allocator.free(npath);
 
         try std.fs.renameAbsolute(rpath, npath);
-
-        return .{ .changed = .{
+        return sys.Rename.init(c.allocator, .{ .changed = .{
             .old = old_name,
             .new = new_name,
-        } };
+        } });
     }
 
-    return .{ .kept = old_name };
+    return sys.Rename.init(c.allocator, .{ .kept = old_name });
 }
 
 fn worker(

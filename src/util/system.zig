@@ -3,23 +3,6 @@ const std = @import("std");
 /// Magic bytes put at the beginning of encrypted files
 pub const magic = [5]u8{ 'v', 'e', 'i', 'l', 1 };
 
-// Encryption metadata such as the original name and the resulting hash
-pub const Rename = union(enum(u1)) {
-    changed: struct { old: []const u8, new: []const u8 },
-    kept: []const u8,
-
-    /// Free allocated resources relating to rename changes
-    pub fn deinit(r: Rename, allocator: std.mem.Allocator) void {
-        switch (r) {
-            .kept => |name| allocator.free(name),
-            .changed => |data| {
-                allocator.free(data.old);
-                allocator.free(data.new);
-            },
-        }
-    }
-};
-
 /// Possible filesystem related errors for utils
 pub const Error = std.mem.Allocator.Error ||
     std.fs.Dir.RealPathError ||
@@ -62,5 +45,33 @@ pub const File = struct {
     pub fn unload(file: File, allocator: std.mem.Allocator) void {
         allocator.free(file.meta.path);
         allocator.free(file.data);
+    }
+};
+
+// Encryption metadata such as the original name and the resulting hash
+pub const Rename = union(enum(u1)) {
+    changed: struct { old: []const u8, new: []const u8 },
+    kept: []const u8,
+
+    /// Initialize a new instance of the rename information struct
+    pub fn init(allocator: std.mem.Allocator, data: Rename) Error!Rename {
+        return switch (data) {
+            .kept => |name| .{ .kept = try allocator.dupe(u8, name) },
+            .changed => |meta| .{ .changed = .{
+                .old = try allocator.dupe(u8, meta.old),
+                .new = try allocator.dupe(u8, meta.new),
+            } },
+        };
+    }
+
+    /// Free allocated resources relating to rename changes
+    pub fn deinit(r: Rename, allocator: std.mem.Allocator) void {
+        switch (r) {
+            .kept => |name| allocator.free(name),
+            .changed => |data| {
+                allocator.free(data.old);
+                allocator.free(data.new);
+            },
+        }
     }
 };
